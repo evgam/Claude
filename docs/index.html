@@ -250,7 +250,7 @@
   <div class="card">
     <div class="card-label">Since Baseline</div>
     <div class="card-value loading" id="baselineReturn">—%</div>
-    <div class="card-sub">vs May 30, 2026 open</div>
+    <div class="card-sub">vs May 30 rebalance</div>
   </div>
   <div class="card">
     <div class="card-label">YTD 2026</div>
@@ -284,21 +284,21 @@
 </div>
 
 <div class="footer">
-  Prices via Yahoo Finance &nbsp;·&nbsp; Baseline: May 30 2026 &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
+  Prices via Yahoo Finance &nbsp;·&nbsp; Rebalanced: May 30 2026 (v2 — high growth) &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
 </div>
 
 <script>
   const PORTFOLIO = [
-    { symbol: 'NVDA',  name: 'Nvidia',       baseline: 211.15, ytdStart: 186.50 },
-    { symbol: 'MSFT',  name: 'Microsoft',     baseline: 449.57, ytdStart: 526.00 },
-    { symbol: 'META',  name: 'Meta',          baseline: 632.53, ytdStart: 660.09 },
-    { symbol: 'AMZN',  name: 'Amazon',        baseline: 270.65, ytdStart: 230.82 },
-    { symbol: 'TSLA',  name: 'Tesla',         baseline: 435.53, ytdStart: 449.72 },
-    { symbol: 'PLTR',  name: 'Palantir',      baseline: 156.59, ytdStart: 177.75 },
-    { symbol: 'CRWD',  name: 'CrowdStrike',   baseline: 730.85, ytdStart: 469.00 },
-    { symbol: 'AXON',  name: 'Axon',          baseline: 448.79, ytdStart: 591.00 },
-    { symbol: 'DDOG',  name: 'Datadog',       baseline: 247.52, ytdStart: 159.00 },
-    { symbol: 'HOOD',  name: 'Robinhood',     baseline:  94.35, ytdStart: 135.00 },
+    { symbol: 'NVDA',  name: 'Nvidia',         baseline: 211.15, ytdStart: 186.50 },
+    { symbol: 'CRWD',  name: 'CrowdStrike',    baseline: 730.85, ytdStart: 469.00 },
+    { symbol: 'DDOG',  name: 'Datadog',        baseline: 247.52, ytdStart: 159.00 },
+    { symbol: 'APP',   name: 'AppLovin',       baseline: 613.02, ytdStart: 613.02 },
+    { symbol: 'ANET',  name: 'Arista Networks',baseline: 159.51, ytdStart: 159.51 },
+    { symbol: 'ARM',   name: 'ARM Holdings',   baseline: 353.25, ytdStart: 353.25 },
+    { symbol: 'NET',   name: 'Cloudflare',     baseline: 241.80, ytdStart: 241.80 },
+    { symbol: 'COIN',  name: 'Coinbase',       baseline: 189.01, ytdStart: 189.01 },
+    { symbol: 'MELI',  name: 'MercadoLibre',   baseline: 1695.66, ytdStart: 1695.66 },
+    { symbol: 'NU',    name: 'Nu Holdings',    baseline:  13.13, ytdStart:  13.13 },
   ];
 
   const SYMBOLS = PORTFOLIO.map(s => s.symbol).join(',');
