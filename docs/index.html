@@ -321,29 +321,43 @@
     return n >= 0 ? '▲' : '▼';
   }
 
+  const PROXIES = [
+    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    url => `https://thingproxy.freeboard.io/fetch/${url}`,
+    url => `https://proxy.cors.sh/${url}`,
+  ];
+
+  async function fetchSingleQuote(symbol) {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+    for (const makeProxy of PROXIES) {
+      try {
+        const res = await fetch(makeProxy(url));
+        if (!res.ok) continue;
+        const json = await res.json();
+        const meta = json?.chart?.result?.[0]?.meta;
+        if (!meta?.regularMarketPrice) continue;
+        const prev = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
+        return {
+          symbol,
+          price: meta.regularMarketPrice,
+          dayChange: meta.regularMarketPrice - prev,
+          dayChangePct: ((meta.regularMarketPrice - prev) / prev) * 100,
+        };
+      } catch (e) { /* try next proxy */ }
+    }
+    return null;
+  }
+
   async function fetchQuotes() {
     const dot = document.getElementById('statusDot');
     dot.className = 'status-dot loading';
     document.getElementById('lastUpdated').textContent = 'Fetching…';
 
-    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${SYMBOLS}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,shortName`;
-    const proxies = [
-      `https://corsproxy.io/?${encodeURIComponent(url)}`,
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    ];
+    const results = await Promise.all(PORTFOLIO.map(s => fetchSingleQuote(s.symbol)));
+    const anySuccess = results.some(r => r !== null);
 
-    let data = null;
-    for (const proxy of proxies) {
-      try {
-        const res = await fetch(proxy, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) continue;
-        const json = await res.json();
-        const results = json?.quoteResponse?.result;
-        if (results && results.length > 0) { data = results; break; }
-      } catch (e) { /* try next */ }
-    }
-
-    if (!data) {
+    if (!anySuccess) {
       dot.className = 'status-dot error';
       document.getElementById('lastUpdated').textContent = 'Could not reach data source — showing baseline prices';
       renderTable(PORTFOLIO.map(s => ({ ...s, price: s.baseline, dayChange: 0, dayChangePct: 0 })));
@@ -351,13 +365,7 @@
     }
 
     const priceMap = {};
-    data.forEach(q => {
-      priceMap[q.symbol] = {
-        price: q.regularMarketPrice,
-        dayChange: q.regularMarketChange,
-        dayChangePct: q.regularMarketChangePercent,
-      };
-    });
+    results.forEach(r => { if (r) priceMap[r.symbol] = r; });
 
     const enriched = PORTFOLIO.map(s => ({
       ...s,
@@ -366,10 +374,11 @@
       dayChangePct: priceMap[s.symbol]?.dayChangePct ?? 0,
     }));
 
-    dot.className = 'status-dot';
+    const fetched = results.filter(Boolean).length;
+    dot.className = fetched === PORTFOLIO.length ? 'status-dot' : 'status-dot loading';
     const now = new Date();
     document.getElementById('lastUpdated').textContent =
-      `Updated ${now.toLocaleTimeString()} · auto-refreshes every 30s`;
+      `Updated ${now.toLocaleTimeString()} · ${fetched}/${PORTFOLIO.length} symbols · auto-refreshes every 30s`;
 
     renderTable(enriched);
     renderSummary(enriched);
