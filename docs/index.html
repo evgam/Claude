@@ -298,6 +298,31 @@
   </table>
 </div>
 
+<div class="bench-wrap" style="max-width:1100px;margin:28px auto 0;">
+  <div style="font-size:0.72rem;color:#64748b;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:10px;">
+    Replacement Bench — swap in when a CUT fires
+  </div>
+  <div class="table-wrap" style="margin:0;">
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Company</th>
+          <th>Price</th>
+          <th>Day Change</th>
+          <th>YTD 2026</th>
+          <th>vs S&amp;P YTD</th>
+          <th>52w High</th>
+          <th>Readiness</th>
+        </tr>
+      </thead>
+      <tbody id="benchTable">
+        <tr><td colspan="8" style="text-align:center;padding:24px;color:#334155;">Loading bench…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <div class="footer">
   Prices via Yahoo Finance &nbsp;·&nbsp; Rebalanced: May 30 2026 (v2 — high growth) &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
 </div>
@@ -314,6 +339,14 @@
     { symbol: 'COIN',  name: 'Coinbase',       baseline: 189.01,  ytdStart: 252.00  },
     { symbol: 'MELI',  name: 'MercadoLibre',   baseline: 1695.66, ytdStart: 1664.42 },
     { symbol: 'NU',    name: 'Nu Holdings',    baseline:  13.13,  ytdStart:  16.50  },
+  ];
+
+  const BENCH = [
+    { symbol: 'PLTR',  name: 'Palantir',         ytdStart: 73.83  },
+    { symbol: 'AXON',  name: 'Axon Enterprise',  ytdStart: 636.99 },
+    { symbol: 'TTD',   name: 'The Trade Desk',   ytdStart: 121.89 },
+    { symbol: 'SNOW',  name: 'Snowflake',        ytdStart: 168.12 },
+    { symbol: 'HIMS',  name: 'Hims & Hers',      ytdStart: 25.79  },
   ];
 
   // SPY Dec 31 2025 close — used to compute S&P 500 YTD for signal benchmarking
@@ -387,12 +420,13 @@
     dot.className = 'status-dot loading';
     document.getElementById('lastUpdated').textContent = 'Fetching…';
 
-    const allSymbols = [...PORTFOLIO.map(s => s.symbol), 'SPY'];
+    const allSymbols = [...PORTFOLIO.map(s => s.symbol), ...BENCH.map(s => s.symbol), 'SPY'];
     const results = await Promise.all(allSymbols.map(fetchSingleQuote));
 
     const spyResult = results[results.length - 1];
     const spyYtdPct = spyResult ? pct(spyResult.price, SPY_YTD_START) : 2;
     const stockResults = results.slice(0, PORTFOLIO.length);
+    const benchResults = results.slice(PORTFOLIO.length, PORTFOLIO.length + BENCH.length);
 
     const anySuccess = stockResults.some(r => r !== null);
     if (!anySuccess) {
@@ -419,8 +453,19 @@
     document.getElementById('lastUpdated').textContent =
       `Updated ${now.toLocaleTimeString()} · ${fetched}/${PORTFOLIO.length} symbols · S&P YTD ${spyYtdPct >= 0 ? '+' : ''}${fmt(spyYtdPct)}% · auto-refreshes every 30s`;
 
+    const benchPriceMap = {};
+    benchResults.forEach(r => { if (r) benchPriceMap[r.symbol] = r; });
+    const enrichedBench = BENCH.map(s => ({
+      ...s,
+      price:            benchPriceMap[s.symbol]?.price            ?? s.ytdStart,
+      dayChange:        benchPriceMap[s.symbol]?.dayChange        ?? 0,
+      dayChangePct:     benchPriceMap[s.symbol]?.dayChangePct     ?? 0,
+      fiftyTwoWeekHigh: benchPriceMap[s.symbol]?.fiftyTwoWeekHigh ?? null,
+    }));
+
     renderTable(enriched, spyYtdPct);
     renderSummary(enriched, spyYtdPct);
+    renderBench(enrichedBench, spyYtdPct);
   }
 
   function renderTable(rows, spyYtdPct) {
@@ -480,6 +525,42 @@
     alertSub.textContent = total === 0
       ? 'No cut or watch signals'
       : `${cutCount > 0 ? cutCount + ' CUT' : ''}${cutCount > 0 && watchCount > 0 ? ', ' : ''}${watchCount > 0 ? watchCount + ' WATCH' : ''}`;
+  }
+
+  function benchReadiness(stock, spyYtdPct) {
+    const ytdPct   = pct(stock.price, stock.ytdStart);
+    const vsMarket = ytdPct - spyYtdPct;
+    const fromHigh = stock.fiftyTwoWeekHigh ? pct(stock.price, stock.fiftyTwoWeekHigh) : 0;
+    if (fromHigh > -10 && vsMarket > 5)
+      return { label: 'READY',  cls: 'sig-add',   tip: `${fmt(fromHigh,1)}% from 52w high, +${fmt(vsMarket,1)}% vs S&P` };
+    if (fromHigh > -15 && vsMarket > -5)
+      return { label: 'WATCH',  cls: 'sig-watch', tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
+    return         { label: 'NOT YET', cls: 'sig-hold',  tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
+  }
+
+  function renderBench(rows, spyYtdPct) {
+    const tbody = document.getElementById('benchTable');
+    tbody.innerHTML = rows.map((s, i) => {
+      const ytd      = pct(s.price, s.ytdStart);
+      const vsMarket = ytd - spyYtdPct;
+      const dayCls   = colorClass(s.dayChangePct);
+      const ytdCls   = colorClass(ytd);
+      const vmCls    = colorClass(vsMarket);
+      const fromHigh = s.fiftyTwoWeekHigh ? pct(s.price, s.fiftyTwoWeekHigh) : null;
+      const ready    = benchReadiness(s, spyYtdPct);
+      return `<tr class="${i % 2 === 0 ? 'theme-row' : ''}">
+        <td><span class="symbol">${s.symbol}</span></td>
+        <td>${s.name}</td>
+        <td class="price">$${fmt(s.price)}</td>
+        <td class="${dayCls}">${arrow(s.dayChangePct)} ${fmt(Math.abs(s.dayChangePct))}%
+          <span style="color:#475569;font-size:0.75rem">&nbsp;$${s.dayChange >= 0 ? '+' : ''}${fmt(s.dayChange)}</span>
+        </td>
+        <td><span class="badge ${ytdCls}">${ytd >= 0 ? '+' : ''}${fmt(ytd)}%</span></td>
+        <td class="${vmCls}">${vsMarket >= 0 ? '+' : ''}${fmt(vsMarket)}%</td>
+        <td class="${fromHigh !== null ? colorClass(fromHigh) : 'flat'}">${fromHigh !== null ? fmt(fromHigh,1)+'%' : '—'}</td>
+        <td><span class="sig ${ready.cls}" title="${ready.tip}">${ready.label}</span></td>
+      </tr>`;
+    }).join('');
   }
 
   fetchQuotes();
