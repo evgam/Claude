@@ -482,7 +482,7 @@
       const sig       = computeSignal(s, totalValue, spyYtdPct);
 
       return `<tr class="${i % 2 === 0 ? 'theme-row' : ''}">
-        <td><span class="symbol">${s.symbol}</span></td>
+        <td><a href="https://finance.yahoo.com/quote/${s.symbol}" target="_blank" rel="noopener" style="text-decoration:none;"><span class="symbol">${s.symbol}</span></a></td>
         <td>${s.name}</td>
         <td class="price">$${fmt(s.price)}</td>
         <td class="${dayCls}">${arrow(s.dayChangePct)} ${fmt(Math.abs(s.dayChangePct))}%
@@ -548,7 +548,7 @@
       const fromHigh = s.fiftyTwoWeekHigh ? pct(s.price, s.fiftyTwoWeekHigh) : null;
       const ready    = benchReadiness(s, spyYtdPct);
       return `<tr class="${i % 2 === 0 ? 'theme-row' : ''}">
-        <td><span class="symbol">${s.symbol}</span></td>
+        <td><a href="https://finance.yahoo.com/quote/${s.symbol}" target="_blank" rel="noopener" style="text-decoration:none;"><span class="symbol">${s.symbol}</span></a></td>
         <td>${s.name}</td>
         <td class="price">$${fmt(s.price)}</td>
         <td class="${dayCls}">${arrow(s.dayChangePct)} ${fmt(Math.abs(s.dayChangePct))}%
