@@ -182,6 +182,8 @@
 
     .theme-row { background: #111827; }
 
+    .loading-cell { color: #334155; }
+
     .refresh-btn {
       background: #1e293b;
       color: #94a3b8;
@@ -225,6 +227,20 @@
 
     .bar-fill.pos { background: #4ade80; }
     .bar-fill.neg { background: #f87171; }
+
+    .sig {
+      display: inline-block;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+    }
+    .sig-hold  { background: #1e293b;   color: #64748b; }
+    .sig-watch { background: #78350f55; color: #fbbf24; }
+    .sig-trim  { background: #1e3a5f55; color: #60a5fa; }
+    .sig-add   { background: #14532d55; color: #4ade80; }
+    .sig-cut   { background: #7f1d1d88; color: #f87171; font-size: 0.75rem; }
   </style>
 </head>
 <body>
@@ -256,9 +272,9 @@
     <div class="card-sub">vs Dec 31, 2025 close</div>
   </div>
   <div class="card">
-    <div class="card-label">Best Today</div>
-    <div class="card-value loading" id="bestToday">—</div>
-    <div class="card-sub" id="bestTodaySub">—</div>
+    <div class="card-label">Alerts</div>
+    <div class="card-value loading" id="alertCount">—</div>
+    <div class="card-sub" id="alertCountSub">—</div>
   </div>
 </div>
 
@@ -273,10 +289,11 @@
         <th>Since Baseline</th>
         <th>YTD 2026</th>
         <th>$10K →</th>
+        <th>Signal</th>
       </tr>
     </thead>
     <tbody id="stockTable">
-      <tr><td colspan="7" style="text-align:center;padding:40px;color:#334155;">Loading live data…</td></tr>
+      <tr><td colspan="8" style="text-align:center;padding:40px;color:#334155;">Loading live data…</td></tr>
     </tbody>
   </table>
 </div>
@@ -299,25 +316,8 @@
     { symbol: 'NU',    name: 'Nu Holdings',    baseline:  13.13,  ytdStart:  16.50  },
   ];
 
-  const SYMBOLS = PORTFOLIO.map(s => s.symbol).join(',');
-
-  function fmt(n, decimals = 2) {
-    return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-  }
-
-  function pct(current, base) {
-    return ((current - base) / base) * 100;
-  }
-
-  function colorClass(n) {
-    if (n > 0.05) return 'pos';
-    if (n < -0.05) return 'neg';
-    return 'flat';
-  }
-
-  function arrow(n) {
-    return n >= 0 ? '▲' : '▼';
-  }
+  // SPY Dec 31 2025 close — used to compute S&P 500 YTD for signal benchmarking
+  const SPY_YTD_START = 585.23;
 
   const PROXIES = [
     url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
@@ -325,6 +325,17 @@
     url => `https://thingproxy.freeboard.io/fetch/${url}`,
     url => `https://proxy.cors.sh/${url}`,
   ];
+
+  function fmt(n, decimals = 2) {
+    return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  }
+  function pct(current, base) { return ((current - base) / base) * 100; }
+  function colorClass(n) {
+    if (n > 0.05) return 'pos';
+    if (n < -0.05) return 'neg';
+    return 'flat';
+  }
+  function arrow(n) { return n >= 0 ? '▲' : '▼'; }
 
   async function fetchSingleQuote(symbol) {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
@@ -341,10 +352,34 @@
           price: meta.regularMarketPrice,
           dayChange: meta.regularMarketPrice - prev,
           dayChangePct: ((meta.regularMarketPrice - prev) / prev) * 100,
+          fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh ?? null,
         };
       } catch (e) { /* try next proxy */ }
     }
     return null;
+  }
+
+  // Signal logic
+  // CUT:   down >20% from 52w high AND underperforming S&P YTD by >15%
+  // TRIM:  position weight drifted above 15% of portfolio
+  // ADD:   position weight drifted below 5% of portfolio
+  // WATCH: down >15% from 52w high OR underperforming S&P YTD by >10%
+  // HOLD:  none of the above
+  function computeSignal(stock, totalValue, spyYtdPct) {
+    const weight = (10000 * (stock.price / stock.baseline)) / totalValue * 100;
+    const ytdPct = pct(stock.price, stock.ytdStart);
+    const vsMarket = ytdPct - spyYtdPct;
+    const fromHigh = stock.fiftyTwoWeekHigh ? pct(stock.price, stock.fiftyTwoWeekHigh) : 0;
+
+    if (fromHigh < -20 && vsMarket < -15)
+      return { label: 'CUT',   cls: 'sig-cut',   tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
+    if (weight > 15)
+      return { label: 'TRIM',  cls: 'sig-trim',  tip: `${fmt(weight,1)}% of portfolio (target 10%)` };
+    if (weight < 5)
+      return { label: 'ADD',   cls: 'sig-add',   tip: `${fmt(weight,1)}% of portfolio (target 10%)` };
+    if (fromHigh < -15 || vsMarket < -10)
+      return { label: 'WATCH', cls: 'sig-watch', tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
+    return   { label: 'HOLD',  cls: 'sig-hold',  tip: `Weight ${fmt(weight,1)}%` };
   }
 
   async function fetchQuotes() {
@@ -352,46 +387,54 @@
     dot.className = 'status-dot loading';
     document.getElementById('lastUpdated').textContent = 'Fetching…';
 
-    const results = await Promise.all(PORTFOLIO.map(s => fetchSingleQuote(s.symbol)));
-    const anySuccess = results.some(r => r !== null);
+    const allSymbols = [...PORTFOLIO.map(s => s.symbol), 'SPY'];
+    const results = await Promise.all(allSymbols.map(fetchSingleQuote));
 
+    const spyResult = results[results.length - 1];
+    const spyYtdPct = spyResult ? pct(spyResult.price, SPY_YTD_START) : 2;
+    const stockResults = results.slice(0, PORTFOLIO.length);
+
+    const anySuccess = stockResults.some(r => r !== null);
     if (!anySuccess) {
       dot.className = 'status-dot error';
       document.getElementById('lastUpdated').textContent = 'Could not reach data source — showing baseline prices';
-      renderTable(PORTFOLIO.map(s => ({ ...s, price: s.baseline, dayChange: 0, dayChangePct: 0 })));
+      renderTable(PORTFOLIO.map(s => ({ ...s, price: s.baseline, dayChange: 0, dayChangePct: 0, fiftyTwoWeekHigh: null })), spyYtdPct);
       return;
     }
 
     const priceMap = {};
-    results.forEach(r => { if (r) priceMap[r.symbol] = r; });
+    stockResults.forEach(r => { if (r) priceMap[r.symbol] = r; });
 
     const enriched = PORTFOLIO.map(s => ({
       ...s,
-      price: priceMap[s.symbol]?.price ?? s.baseline,
-      dayChange: priceMap[s.symbol]?.dayChange ?? 0,
-      dayChangePct: priceMap[s.symbol]?.dayChangePct ?? 0,
+      price:            priceMap[s.symbol]?.price            ?? s.baseline,
+      dayChange:        priceMap[s.symbol]?.dayChange        ?? 0,
+      dayChangePct:     priceMap[s.symbol]?.dayChangePct     ?? 0,
+      fiftyTwoWeekHigh: priceMap[s.symbol]?.fiftyTwoWeekHigh ?? null,
     }));
 
-    const fetched = results.filter(Boolean).length;
+    const fetched = stockResults.filter(Boolean).length;
     dot.className = fetched === PORTFOLIO.length ? 'status-dot' : 'status-dot loading';
     const now = new Date();
     document.getElementById('lastUpdated').textContent =
-      `Updated ${now.toLocaleTimeString()} · ${fetched}/${PORTFOLIO.length} symbols · auto-refreshes every 30s`;
+      `Updated ${now.toLocaleTimeString()} · ${fetched}/${PORTFOLIO.length} symbols · S&P YTD ${spyYtdPct >= 0 ? '+' : ''}${fmt(spyYtdPct)}% · auto-refreshes every 30s`;
 
-    renderTable(enriched);
-    renderSummary(enriched);
+    renderTable(enriched, spyYtdPct);
+    renderSummary(enriched, spyYtdPct);
   }
 
-  function renderTable(rows) {
+  function renderTable(rows, spyYtdPct) {
+    const totalValue = rows.reduce((sum, s) => sum + 10000 * (s.price / s.baseline), 0);
     const tbody = document.getElementById('stockTable');
     tbody.innerHTML = rows.map((s, i) => {
       const sinceBase = pct(s.price, s.baseline);
-      const ytd = pct(s.price, s.ytdStart);
-      const value = 10000 * (s.price / s.baseline);
-      const dayCls = colorClass(s.dayChangePct);
-      const baseCls = colorClass(sinceBase);
-      const ytdCls = colorClass(ytd);
-      const barWidth = Math.min(Math.abs(sinceBase), 100);
+      const ytd       = pct(s.price, s.ytdStart);
+      const value     = 10000 * (s.price / s.baseline);
+      const dayCls    = colorClass(s.dayChangePct);
+      const baseCls   = colorClass(sinceBase);
+      const ytdCls    = colorClass(ytd);
+      const barWidth  = Math.min(Math.abs(sinceBase), 100);
+      const sig       = computeSignal(s, totalValue, spyYtdPct);
 
       return `<tr class="${i % 2 === 0 ? 'theme-row' : ''}">
         <td><span class="symbol">${s.symbol}</span></td>
@@ -408,35 +451,34 @@
         </td>
         <td><span class="badge ${ytdCls}">${ytd >= 0 ? '+' : ''}${fmt(ytd)}%</span></td>
         <td class="${baseCls}" style="font-weight:600">$${fmt(value, 0)}</td>
+        <td><span class="sig ${sig.cls}" title="${sig.tip}">${sig.label}</span></td>
       </tr>`;
     }).join('');
   }
 
-  function renderSummary(rows) {
-    const totalValue = rows.reduce((sum, s) => sum + 10000 * (s.price / s.baseline), 0);
-    const baselineReturn = ((totalValue - 100000) / 100000) * 100;
+  function renderSummary(rows, spyYtdPct) {
+    const totalValue    = rows.reduce((sum, s) => sum + 10000 * (s.price / s.baseline), 0);
+    const baselineReturn = pct(totalValue, 100000);
+    const ytdValue      = rows.reduce((sum, s) => sum + 10000 * (s.price / s.ytdStart), 0);
+    const ytdReturn     = pct(ytdValue, 100000);
+    const cutCount      = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'CUT').length;
+    const watchCount    = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'WATCH').length;
 
-    const ytdValue = rows.reduce((sum, s) => sum + 10000 * (s.price / s.ytdStart), 0);
-    const ytdReturn = ((ytdValue - 100000) / 100000) * 100;
+    document.getElementById('totalValue').textContent    = `$${fmt(totalValue, 0)}`;
+    document.getElementById('totalValue').className      = `card-value ${colorClass(baselineReturn)}`;
+    document.getElementById('baselineReturn').textContent = `${baselineReturn >= 0 ? '+' : ''}${fmt(baselineReturn)}%`;
+    document.getElementById('baselineReturn').className  = `card-value ${colorClass(baselineReturn)}`;
+    document.getElementById('ytdReturn').textContent     = `${ytdReturn >= 0 ? '+' : ''}${fmt(ytdReturn)}%`;
+    document.getElementById('ytdReturn').className       = `card-value ${colorClass(ytdReturn)}`;
 
-    const best = rows.reduce((a, b) => b.dayChangePct > a.dayChangePct ? b : a, rows[0]);
-
-    const tvEl = document.getElementById('totalValue');
-    tvEl.textContent = `$${fmt(totalValue, 0)}`;
-    tvEl.className = `card-value ${colorClass(baselineReturn)}`;
-
-    const brEl = document.getElementById('baselineReturn');
-    brEl.textContent = `${baselineReturn >= 0 ? '+' : ''}${fmt(baselineReturn)}%`;
-    brEl.className = `card-value ${colorClass(baselineReturn)}`;
-
-    const ytdEl = document.getElementById('ytdReturn');
-    ytdEl.textContent = `${ytdReturn >= 0 ? '+' : ''}${fmt(ytdReturn)}%`;
-    ytdEl.className = `card-value ${colorClass(ytdReturn)}`;
-
-    const btEl = document.getElementById('bestToday');
-    btEl.textContent = `${best.symbol} +${fmt(best.dayChangePct)}%`;
-    btEl.className = `card-value pos`;
-    document.getElementById('bestTodaySub').textContent = `$${fmt(best.dayChange)} today`;
+    const alertEl  = document.getElementById('alertCount');
+    const alertSub = document.getElementById('alertCountSub');
+    const total    = cutCount + watchCount;
+    alertEl.textContent  = total === 0 ? 'All Clear' : `${total} Alert${total > 1 ? 's' : ''}`;
+    alertEl.className    = `card-value ${total === 0 ? 'pos' : cutCount > 0 ? 'neg' : ''}`;
+    alertSub.textContent = total === 0
+      ? 'No cut or watch signals'
+      : `${cutCount > 0 ? cutCount + ' CUT' : ''}${cutCount > 0 && watchCount > 0 ? ', ' : ''}${watchCount > 0 ? watchCount + ' WATCH' : ''}`;
   }
 
   fetchQuotes();
