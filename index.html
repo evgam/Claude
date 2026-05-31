@@ -329,27 +329,27 @@
 
 <script>
   const PORTFOLIO = [
-    { symbol: 'NVDA',  name: 'Nvidia',         baseline: 211.15,  ytdStart: 186.50  },
-    { symbol: 'CRWD',  name: 'CrowdStrike',    baseline: 730.85,  ytdStart: 469.00  },
-    { symbol: 'DDOG',  name: 'Datadog',        baseline: 247.52,  ytdStart: 159.00  },
-    { symbol: 'APP',   name: 'AppLovin',       baseline: 613.02,  ytdStart: 672.24  },
-    { symbol: 'ANET',  name: 'Arista Networks',baseline: 159.51,  ytdStart: 131.07  },
-    { symbol: 'ARM',   name: 'ARM Holdings',   baseline: 353.25,  ytdStart: 162.00  },
-    { symbol: 'NET',   name: 'Cloudflare',     baseline: 241.80,  ytdStart: 195.00  },
-    { symbol: 'COIN',  name: 'Coinbase',       baseline: 189.01,  ytdStart: 252.00  },
-    { symbol: 'MELI',  name: 'MercadoLibre',   baseline: 1695.66, ytdStart: 1664.42 },
-    { symbol: 'NU',    name: 'Nu Holdings',    baseline:  13.13,  ytdStart:  16.50  },
+    { symbol: 'NVDA',  name: 'Nvidia',          baseline: 211.15,  ytdStart: 186.50  },
+    { symbol: 'CRWD',  name: 'CrowdStrike',     baseline: 730.85,  ytdStart: 469.00  },
+    { symbol: 'DDOG',  name: 'Datadog',         baseline: 247.52,  ytdStart: 159.00  },
+    { symbol: 'APP',   name: 'AppLovin',        baseline: 613.02,  ytdStart: 672.24  },
+    { symbol: 'ANET',  name: 'Arista Networks', baseline: 159.51,  ytdStart: 131.07  },
+    { symbol: 'ARM',   name: 'ARM Holdings',    baseline: 353.25,  ytdStart: 162.00  },
+    { symbol: 'NET',   name: 'Cloudflare',      baseline: 241.80,  ytdStart: 195.00  },
+    { symbol: 'COIN',  name: 'Coinbase',        baseline: 189.01,  ytdStart: 252.00  },
+    { symbol: 'MELI',  name: 'MercadoLibre',    baseline: 1695.66, ytdStart: 1664.42 },
+    { symbol: 'NU',    name: 'Nu Holdings',     baseline:  13.13,  ytdStart:  16.50  },
   ];
 
   const BENCH = [
-    { symbol: 'PLTR',  name: 'Palantir',         ytdStart: 73.83  },
-    { symbol: 'AXON',  name: 'Axon Enterprise',  ytdStart: 636.99 },
-    { symbol: 'TTD',   name: 'The Trade Desk',   ytdStart: 121.89 },
-    { symbol: 'SNOW',  name: 'Snowflake',        ytdStart: 168.12 },
-    { symbol: 'HIMS',  name: 'Hims & Hers',      ytdStart: 25.79  },
+    { symbol: 'PLTR',  name: 'Palantir',        ytdStart: 73.83   },
+    { symbol: 'AXON',  name: 'Axon Enterprise', ytdStart: 636.99  },
+    { symbol: 'TTD',   name: 'The Trade Desk',  ytdStart: 121.89  },
+    { symbol: 'SNOW',  name: 'Snowflake',       ytdStart: 168.12  },
+    { symbol: 'HIMS',  name: 'Hims & Hers',     ytdStart: 25.79   },
   ];
 
-  // SPY Dec 31 2025 close — used to compute S&P 500 YTD for signal benchmarking
+  // Fallback SPY Dec 31 2025 close if live fetch fails
   const SPY_YTD_START = 585.23;
 
   const PROXIES = [
@@ -371,21 +371,27 @@
   function arrow(n) { return n >= 0 ? '▲' : '▼'; }
 
   async function fetchSingleQuote(symbol) {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`;
+    // range=ytd gives full year daily data — first close = actual YTD start, last = current price
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=ytd`;
     for (const makeProxy of PROXIES) {
       try {
         const res = await fetch(makeProxy(url));
         if (!res.ok) continue;
         const json = await res.json();
-        const meta = json?.chart?.result?.[0]?.meta;
+        const result = json?.chart?.result?.[0];
+        const meta   = result?.meta;
         if (!meta?.regularMarketPrice) continue;
-        const prev = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
+        const closes = result?.indicators?.quote?.[0]?.close ?? [];
+        const prev   = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
+        // First non-null close in the YTD series = first trading day of the year
+        const ytdStartPrice = closes.find(c => c != null) ?? null;
         return {
           symbol,
-          price: meta.regularMarketPrice,
-          dayChange: meta.regularMarketPrice - prev,
-          dayChangePct: ((meta.regularMarketPrice - prev) / prev) * 100,
+          price:            meta.regularMarketPrice,
+          dayChange:        meta.regularMarketPrice - prev,
+          dayChangePct:     ((meta.regularMarketPrice - prev) / prev) * 100,
           fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh ?? null,
+          ytdStartLive:     ytdStartPrice,
         };
       } catch (e) { /* try next proxy */ }
     }
@@ -424,7 +430,8 @@
     const results = await Promise.all(allSymbols.map(fetchSingleQuote));
 
     const spyResult = results[results.length - 1];
-    const spyYtdPct = spyResult ? pct(spyResult.price, SPY_YTD_START) : 2;
+    const spyBase   = spyResult?.ytdStartLive ?? SPY_YTD_START;
+    const spyYtdPct = spyResult ? pct(spyResult.price, spyBase) : 2;
     const stockResults = results.slice(0, PORTFOLIO.length);
     const benchResults = results.slice(PORTFOLIO.length, PORTFOLIO.length + BENCH.length);
 
@@ -445,6 +452,7 @@
       dayChange:        priceMap[s.symbol]?.dayChange        ?? 0,
       dayChangePct:     priceMap[s.symbol]?.dayChangePct     ?? 0,
       fiftyTwoWeekHigh: priceMap[s.symbol]?.fiftyTwoWeekHigh ?? null,
+      ytdStart:         priceMap[s.symbol]?.ytdStartLive     ?? s.ytdStart,
     }));
 
     const fetched = stockResults.filter(Boolean).length;
@@ -461,6 +469,7 @@
       dayChange:        benchPriceMap[s.symbol]?.dayChange        ?? 0,
       dayChangePct:     benchPriceMap[s.symbol]?.dayChangePct     ?? 0,
       fiftyTwoWeekHigh: benchPriceMap[s.symbol]?.fiftyTwoWeekHigh ?? null,
+      ytdStart:         benchPriceMap[s.symbol]?.ytdStartLive     ?? s.ytdStart,
     }));
 
     renderTable(enriched, spyYtdPct);
