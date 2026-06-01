@@ -6,6 +6,7 @@
   <title>Robinhood vs VOO — Performance Chart</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -17,10 +18,7 @@
       padding: 24px 16px;
     }
 
-    header {
-      text-align: center;
-      margin-bottom: 32px;
-    }
+    header { text-align: center; margin-bottom: 32px; }
 
     header h1 {
       font-size: 1.8rem;
@@ -91,10 +89,7 @@
       padding: 24px;
     }
 
-    .chart-container {
-      position: relative;
-      height: 420px;
-    }
+    .chart-container { position: relative; height: 440px; }
 
     .legend {
       display: flex;
@@ -102,41 +97,17 @@
       gap: 28px;
       margin-bottom: 20px;
       font-size: 0.82rem;
+      flex-wrap: wrap;
     }
 
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-swatch { width: 28px; height: 3px; border-radius: 2px; }
+    .legend-tick { width: 2px; height: 14px; border-radius: 1px; }
 
-    .legend-swatch {
-      width: 28px;
-      height: 3px;
-      border-radius: 2px;
-    }
+    .footer { text-align: center; margin-top: 24px; font-size: 0.7rem; color: #334155; }
+    .note   { text-align: center; font-size: 0.72rem; color: #475569; margin-top: 14px; }
 
-    .footer {
-      text-align: center;
-      margin-top: 24px;
-      font-size: 0.7rem;
-      color: #334155;
-    }
-
-    .note {
-      text-align: center;
-      font-size: 0.72rem;
-      color: #475569;
-      margin-top: 14px;
-    }
-
-    .back-link {
-      display: inline-block;
-      margin-top: 8px;
-      font-size: 0.75rem;
-      color: #60a5fa;
-      text-decoration: none;
-    }
+    .back-link { display: inline-block; margin-top: 8px; font-size: 0.75rem; color: #60a5fa; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
   </style>
 </head>
@@ -144,7 +115,7 @@
 
 <header>
   <h1>Robinhood Retirement vs VOO</h1>
-  <div class="subtitle">Performance since Jan 2, 2025 · Both indexed to $190,000</div>
+  <div class="subtitle">Performance since Jan 2, 2025 · Both start at $190,000 + same contributions</div>
   <div class="meta-row">
     <span><span class="status-dot loading" id="statusDot"></span></span>
     <span id="statusText">Loading historical data…</span>
@@ -158,9 +129,9 @@
     <div class="card-sub" id="rhSub">current value</div>
   </div>
   <div class="card">
-    <div class="card-label">VOO (same $190K)</div>
+    <div class="card-label">VOO (same contributions)</div>
     <div class="card-value loading" id="vooValue">—</div>
-    <div class="card-sub" id="vooSub">if invested Jan 2, 2025</div>
+    <div class="card-sub" id="vooSub">$190K + monthly Roth adds</div>
   </div>
   <div class="card">
     <div class="card-label">You vs VOO</div>
@@ -168,9 +139,9 @@
     <div class="card-sub" id="alphaSub">dollar difference</div>
   </div>
   <div class="card">
-    <div class="card-label">Your Return</div>
-    <div class="card-value loading" id="rhReturn">—</div>
-    <div class="card-sub">since Jan 2, 2025</div>
+    <div class="card-label">Total Contributed</div>
+    <div class="card-value loading" id="contribValue">—</div>
+    <div class="card-sub">$190K start + Roth adds</div>
   </div>
 </div>
 
@@ -181,8 +152,12 @@
       <span style="color:#60a5fa;font-weight:600;">Robinhood Retirement</span>
     </div>
     <div class="legend-item">
-      <div class="legend-swatch" style="background:#a78bfa;"></div>
-      <span style="color:#a78bfa;font-weight:600;">VOO</span>
+      <div class="legend-swatch" style="background:#a78bfa;border-top:2px dashed #a78bfa;height:0;"></div>
+      <span style="color:#a78bfa;font-weight:600;">VOO (same cash)</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-tick" style="background:#4ade8066;"></div>
+      <span style="color:#4ade80;opacity:.7;">Roth contribution</span>
     </div>
   </div>
   <div class="chart-container">
@@ -191,8 +166,9 @@
 </div>
 
 <p class="note">
-  Chart reconstructs daily portfolio value using current share quantities × historical prices.<br>
-  Prices via Yahoo Finance · Contributions not yet reflected in daily reconstruction.
+  Robinhood line uses current share quantities × historical prices (approximation).<br>
+  VOO line mirrors your exact contribution schedule — $190K on Jan 2, 2025 + equal monthly Roth adds.<br>
+  Prices via Yahoo Finance.
 </p>
 <div style="text-align:center;margin-top:12px;">
   <a class="back-link" href="index.html">← Back to Claude Picks dashboard</a>
@@ -205,16 +181,29 @@
 <script>
   // Combined share quantities across Roth + Traditional IRAs
   const HOLDINGS = [
-    { symbol: 'NVDA',  qty: 44.127883  + 60.531271   },  // 104.659154
-    { symbol: 'FBTC',  qty: 120.778083 + 57.329832   },  // 178.107915
-    { symbol: 'VGT',   qty: 70.360807  + 1195.061804 },  // 1265.422611
-    { symbol: 'AVGO',  qty: 24.062957  + 28.155878   },  // 52.218835
-    { symbol: 'GOOGL', qty: 26.309530  + 35.463820   },  // 61.773350
-    { symbol: 'VT',    qty: 0          + 331.490412  },  // 331.490412
+    { symbol: 'NVDA',  qty: 44.127883  + 60.531271   },
+    { symbol: 'FBTC',  qty: 120.778083 + 57.329832   },
+    { symbol: 'VGT',   qty: 70.360807  + 1195.061804 },
+    { symbol: 'AVGO',  qty: 24.062957  + 28.155878   },
+    { symbol: 'GOOGL', qty: 26.309530  + 35.463820   },
+    { symbol: 'VT',    qty: 0          + 331.490412  },
   ];
 
   const STARTING_VALUE = 190000;
-  const START_DATE     = new Date('2025-01-02');
+  const START_DATE_STR = '2025-01-02';
+
+  // Roth contributions spread equally across months
+  // 2025: $7,000 / 12 months; 2026: $820 / 12 months
+  const CONTRIBUTIONS = [];
+  for (let m = 0; m < 12; m++) {
+    const d = new Date(2025, m, 1);
+    CONTRIBUTIONS.push({ date: d.toISOString().slice(0, 10), amount: 7000 / 12 });
+  }
+  for (let m = 0; m < 12; m++) {
+    const d = new Date(2026, m, 1);
+    CONTRIBUTIONS.push({ date: d.toISOString().slice(0, 10), amount: 820 / 12 });
+  }
+  const totalContributed = STARTING_VALUE + 7000 + 820;
 
   const PROXIES = [
     u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
@@ -234,12 +223,10 @@
         if (!result) continue;
         const timestamps = result.timestamps ?? result.timestamp ?? [];
         const closes     = result.indicators?.quote?.[0]?.close ?? [];
-        // Build date → price map, skip nulls
         const map = {};
         timestamps.forEach((ts, i) => {
           if (closes[i] != null) {
-            const d = new Date(ts * 1000);
-            const key = d.toISOString().slice(0, 10);
+            const key = new Date(ts * 1000).toISOString().slice(0, 10);
             map[key] = closes[i];
           }
         });
@@ -247,6 +234,12 @@
       } catch (e) { /* try next */ }
     }
     return null;
+  }
+
+  // Find the nearest trading day at or after a given date string
+  function nearestTradingDay(dateStr, sortedDates) {
+    if (sortedDates.includes(dateStr)) return dateStr;
+    return sortedDates.find(d => d >= dateStr) ?? null;
   }
 
   function fmt(n, dec = 0) {
@@ -257,40 +250,51 @@
     const dot  = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
 
-    const symbols  = [...HOLDINGS.map(h => h.symbol), 'VOO'];
-    const results  = await Promise.all(symbols.map(fetchHistory));
+    const symbols = [...HOLDINGS.map(h => h.symbol), 'VOO'];
+    const results = await Promise.all(symbols.map(fetchHistory));
 
     const historyMap = {};
     symbols.forEach((sym, i) => { historyMap[sym] = results[i]; });
 
-    const anyFailed = symbols.some(s => !historyMap[s]);
     if (symbols.every(s => !historyMap[s])) {
-      dot.className  = 'status-dot error';
+      dot.className = 'status-dot error';
       text.textContent = 'Could not load data — try refreshing';
       return;
     }
 
-    // Find all trading dates common to VOO (most complete) and at least one holding
-    const vooDates = Object.keys(historyMap['VOO'] || {}).sort();
-
-    // Filter to dates on or after Jan 2, 2025
-    const startStr = START_DATE.toISOString().slice(0, 10);
-    const dates    = vooDates.filter(d => d >= startStr);
+    const allDates = Object.keys(historyMap['VOO'] || {}).sort();
+    const dates    = allDates.filter(d => d >= START_DATE_STR);
 
     if (dates.length < 5) {
-      dot.className  = 'status-dot error';
+      dot.className = 'status-dot error';
       text.textContent = 'Not enough historical data loaded';
       return;
     }
 
-    // For each date, compute portfolio value
+    // Build VOO series with contribution-matched cash flow
+    // On each trading day, check if any contributions have occurred since last day
+    // and buy additional VOO shares with that cash
+    let vooShares   = null;  // set on first valid day
+    let normRH      = null;
     const rhSeries  = [];
     const vooSeries = [];
-    let   normRH    = null;
-    let   normVOO   = null;
+    const contribDone = new Set();
 
     dates.forEach(date => {
-      // Portfolio value on this date
+      // Apply any contributions whose nearest trading day is this date
+      CONTRIBUTIONS.forEach(c => {
+        if (contribDone.has(c.date)) return;
+        const tDay = nearestTradingDay(c.date, dates);
+        if (tDay === date) {
+          const vooPrice = historyMap['VOO'][date];
+          if (vooShares !== null && vooPrice) {
+            vooShares += c.amount / vooPrice;
+          }
+          contribDone.add(c.date);
+        }
+      });
+
+      // Compute portfolio value
       let portVal = 0;
       let allHave = true;
       HOLDINGS.forEach(h => {
@@ -302,21 +306,21 @@
       const vooPrice = historyMap['VOO']?.[date];
       if (!vooPrice || !allHave) return;
 
-      // Set normalization anchors on first valid date
+      // Initialize on first valid date
       if (normRH === null) {
-        normRH  = portVal;
-        normVOO = vooPrice;
+        normRH   = portVal;
+        vooShares = STARTING_VALUE / vooPrice;
       }
 
-      const scaledRH  = (portVal  / normRH)  * STARTING_VALUE;
-      const scaledVOO = (vooPrice / normVOO) * STARTING_VALUE;
+      const scaledRH  = (portVal / normRH) * STARTING_VALUE;
+      const vooValue  = vooShares * vooPrice;
 
-      rhSeries.push( { x: date, y: scaledRH  });
-      vooSeries.push({ x: date, y: scaledVOO });
+      rhSeries.push( { x: date, y: scaledRH });
+      vooSeries.push({ x: date, y: vooValue  });
     });
 
     // Update summary cards
-    const lastRH  = rhSeries[rhSeries.length - 1]?.y   ?? 0;
+    const lastRH  = rhSeries[rhSeries.length - 1]?.y  ?? 0;
     const lastVOO = vooSeries[vooSeries.length - 1]?.y ?? 0;
     const diff    = lastRH - lastVOO;
     const rhRet   = (lastRH  - STARTING_VALUE) / STARTING_VALUE * 100;
@@ -324,8 +328,6 @@
 
     document.getElementById('rhValue').textContent  = '$' + fmt(lastRH);
     document.getElementById('rhValue').className    = 'card-value ' + (rhRet >= 0 ? 'pos' : 'neg');
-    document.getElementById('rhReturn').textContent = (rhRet >= 0 ? '+' : '') + rhRet.toFixed(1) + '%';
-    document.getElementById('rhReturn').className   = 'card-value ' + (rhRet >= 0 ? 'pos' : 'neg');
     document.getElementById('rhSub').textContent    = (rhRet >= 0 ? '+' : '') + rhRet.toFixed(1) + '% vs $190K start';
 
     document.getElementById('vooValue').textContent = '$' + fmt(lastVOO);
@@ -334,12 +336,32 @@
 
     document.getElementById('alphaValue').textContent = (diff >= 0 ? '+$' : '-$') + fmt(Math.abs(diff));
     document.getElementById('alphaValue').className   = 'card-value ' + (diff >= 0 ? 'pos' : 'neg');
-    document.getElementById('alphaSub').textContent   = (diff >= 0 ? 'ahead of' : 'behind') + ' VOO · ' + (diff/lastVOO*100).toFixed(1) + '%';
+    document.getElementById('alphaSub').textContent   = (diff >= 0 ? 'ahead of' : 'behind') + ' VOO · ' + (diff / lastVOO * 100).toFixed(1) + '%';
 
-    dot.className  = 'status-dot';
+    document.getElementById('contribValue').textContent = '$' + fmt(totalContributed);
+    document.getElementById('contribValue').className   = 'card-value';
+
+    dot.className = 'status-dot';
     text.textContent = `${dates.length} trading days · prices via Yahoo Finance`;
 
-    // Draw chart
+    // Build contribution annotations (vertical lines on 1st of each month)
+    const annotations = {};
+    CONTRIBUTIONS.forEach((c, i) => {
+      const tDay = nearestTradingDay(c.date, dates);
+      if (!tDay) return;
+      // Only label one per quarter to avoid clutter
+      const label = (new Date(c.date).getMonth() % 3 === 0)
+        ? { content: '+$' + fmt(c.amount * 3, 0), enabled: true, position: 'start', color: '#4ade8099', font: { size: 9 }, yAdjust: -6 }
+        : { enabled: false };
+      annotations['contrib_' + i] = {
+        type: 'line',
+        xMin: tDay, xMax: tDay,
+        borderColor: 'rgba(74,222,128,0.18)',
+        borderWidth: 1,
+        label,
+      };
+    });
+
     const ctx = document.getElementById('perfChart').getContext('2d');
     new Chart(ctx, {
       type: 'line',
@@ -349,18 +371,18 @@
             label: 'Robinhood Retirement',
             data:  rhSeries,
             borderColor:     '#60a5fa',
-            backgroundColor: 'rgba(96,165,250,0.08)',
+            backgroundColor: 'rgba(96,165,250,0.07)',
             borderWidth: 2.5,
             pointRadius: 0,
             pointHoverRadius: 5,
-            fill: false,
+            fill: true,
             tension: 0.2,
           },
           {
-            label: 'VOO',
+            label: 'VOO (same cash)',
             data:  vooSeries,
             borderColor:     '#a78bfa',
-            backgroundColor: 'rgba(167,139,250,0.06)',
+            backgroundColor: 'transparent',
             borderWidth: 2,
             pointRadius: 0,
             pointHoverRadius: 5,
@@ -376,6 +398,7 @@
         interaction: { mode: 'index', intersect: false },
         plugins: {
           legend: { display: false },
+          annotation: { annotations },
           tooltip: {
             backgroundColor: '#1e293b',
             borderColor: '#334155',
@@ -386,7 +409,8 @@
             callbacks: {
               label: ctx => {
                 const val = ctx.parsed.y;
-                const ret = (val - STARTING_VALUE) / STARTING_VALUE * 100;
+                const base = STARTING_VALUE;
+                const ret  = (val - base) / base * 100;
                 return `  ${ctx.dataset.label}: $${fmt(val)}  (${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%)`;
               },
             },
@@ -396,12 +420,12 @@
           x: {
             type: 'time',
             time: { unit: 'month', displayFormats: { month: 'MMM yy' } },
-            grid:   { color: '#1e293b' },
-            ticks:  { color: '#475569', font: { size: 11 } },
+            grid:  { color: '#1e293b' },
+            ticks: { color: '#475569', font: { size: 11 } },
           },
           y: {
-            grid:   { color: '#1e293b' },
-            ticks:  {
+            grid:  { color: '#1e293b' },
+            ticks: {
               color: '#475569',
               font:  { size: 11 },
               callback: v => '$' + fmt(v),
