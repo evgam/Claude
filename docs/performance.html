@@ -109,6 +109,55 @@
 
     .back-link { display: inline-block; margin-top: 8px; font-size: 0.75rem; color: #60a5fa; text-decoration: none; }
     .back-link:hover { text-decoration: underline; }
+
+    .holdings-wrap {
+      max-width: 1000px;
+      margin: 28px auto 0;
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 20px 24px;
+    }
+
+    .holdings-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      color: #64748b;
+      margin-bottom: 14px;
+    }
+
+    .holdings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .holdings-table th {
+      text-align: right;
+      color: #475569;
+      font-weight: 500;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      padding: 0 10px 8px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .holdings-table th:first-child { text-align: left; }
+
+    .holdings-table td {
+      text-align: right;
+      padding: 9px 10px;
+      border-bottom: 1px solid #0f172a;
+      color: #cbd5e1;
+    }
+
+    .holdings-table td:first-child { text-align: left; font-weight: 600; color: #f1f5f9; }
+    .holdings-table tr:last-child td { border-bottom: none; font-weight: 700; color: #f1f5f9; }
+    .holdings-table .pos { color: #4ade80; }
+    .holdings-table .neg { color: #f87171; }
+    .holdings-table .pct  { font-size: 0.75rem; color: #64748b; }
   </style>
 </head>
 <body>
@@ -163,6 +212,25 @@
   <div class="chart-container">
     <canvas id="perfChart"></canvas>
   </div>
+</div>
+
+<div class="holdings-wrap">
+  <div class="holdings-title">Holdings Breakdown</div>
+  <table class="holdings-table">
+    <thead>
+      <tr>
+        <th>Symbol</th>
+        <th>Shares</th>
+        <th>Price</th>
+        <th>Value</th>
+        <th>Day Change</th>
+        <th>Allocation</th>
+      </tr>
+    </thead>
+    <tbody id="holdingsBody">
+      <tr><td colspan="6" style="text-align:center;color:#334155;padding:16px;">Loading…</td></tr>
+    </tbody>
+  </table>
 </div>
 
 <p class="note">
@@ -343,6 +411,47 @@
 
     dot.className = 'status-dot';
     text.textContent = `${dates.length} trading days · prices via Yahoo Finance`;
+
+    // Build holdings table using most recent prices from historyMap
+    const recentDate = dates[dates.length - 1];
+    const prevDate   = dates[dates.length - 2];
+    const totalVal   = HOLDINGS.reduce((sum, h) => {
+      return sum + h.qty * (historyMap[h.symbol]?.[recentDate] ?? 0);
+    }, 0);
+
+    const tbody = document.getElementById('holdingsBody');
+    tbody.innerHTML = '';
+    let totalDayChg = 0;
+
+    HOLDINGS.forEach(h => {
+      const price     = historyMap[h.symbol]?.[recentDate] ?? 0;
+      const prevPrice = historyMap[h.symbol]?.[prevDate]   ?? price;
+      const value     = h.qty * price;
+      const dayChg    = h.qty * (price - prevPrice);
+      const dayChgPct = prevPrice ? (price - prevPrice) / prevPrice * 100 : 0;
+      const alloc     = totalVal ? value / totalVal * 100 : 0;
+      totalDayChg += dayChg;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${h.symbol}</td>
+        <td>${h.qty.toLocaleString('en-US', {minimumFractionDigits:3,maximumFractionDigits:3})}</td>
+        <td>$${fmt(price, 2)}</td>
+        <td>$${fmt(value)}</td>
+        <td class="${dayChg >= 0 ? 'pos' : 'neg'}">${dayChg >= 0 ? '+' : ''}$${fmt(Math.abs(dayChg))} <span class="pct">(${dayChgPct >= 0 ? '+' : ''}${dayChgPct.toFixed(1)}%)</span></td>
+        <td>${alloc.toFixed(1)}%</td>`;
+      tbody.appendChild(tr);
+    });
+
+    const tfoot = document.createElement('tr');
+    tfoot.innerHTML = `
+      <td>Total</td>
+      <td></td>
+      <td></td>
+      <td>$${fmt(totalVal)}</td>
+      <td class="${totalDayChg >= 0 ? 'pos' : 'neg'}">${totalDayChg >= 0 ? '+' : ''}$${fmt(Math.abs(totalDayChg))}</td>
+      <td>100%</td>`;
+    tbody.appendChild(tfoot);
 
     // Build contribution annotations (vertical lines on 1st of each month)
     const annotations = {};
