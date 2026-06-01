@@ -324,33 +324,32 @@
 </div>
 
 <div class="footer">
-  Prices via Yahoo Finance &nbsp;·&nbsp; Rebalanced: May 30 2026 (v2 &mdash; high growth) &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
+  Prices via Yahoo Finance &nbsp;·&nbsp; Rebalanced: May 30 2026 (v2 — high growth) &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
   &nbsp;·&nbsp; <a href="performance.html" style="color:#60a5fa;text-decoration:none;">📈 Robinhood vs VOO chart</a>
 </div>
 
 <script>
   const PORTFOLIO = [
-    { symbol: 'NVDA',  name: 'Nvidia',         baseline: 211.15,  ytdStart: 186.50  },
-    { symbol: 'CRWD',  name: 'CrowdStrike',    baseline: 730.85,  ytdStart: 469.00  },
-    { symbol: 'DDOG',  name: 'Datadog',        baseline: 247.52,  ytdStart: 159.00  },
-    { symbol: 'APP',   name: 'AppLovin',       baseline: 613.02,  ytdStart: 672.24  },
-    { symbol: 'ANET',  name: 'Arista Networks',baseline: 159.51,  ytdStart: 131.07  },
-    { symbol: 'ARM',   name: 'ARM Holdings',   baseline: 353.25,  ytdStart: 162.00  },
-    { symbol: 'NET',   name: 'Cloudflare',     baseline: 241.80,  ytdStart: 195.00  },
-    { symbol: 'COIN',  name: 'Coinbase',       baseline: 189.01,  ytdStart: 252.00  },
-    { symbol: 'MELI',  name: 'MercadoLibre',   baseline: 1695.66, ytdStart: 1664.42 },
-    { symbol: 'NU',    name: 'Nu Holdings',    baseline:  13.13,  ytdStart:  16.50  },
+    { symbol: 'NVDA',  name: 'Nvidia',          baseline: 211.15,  ytdStart: 186.50  },
+    { symbol: 'CRWD',  name: 'CrowdStrike',     baseline: 730.85,  ytdStart: 469.00  },
+    { symbol: 'DDOG',  name: 'Datadog',         baseline: 247.52,  ytdStart: 159.00  },
+    { symbol: 'APP',   name: 'AppLovin',        baseline: 613.02,  ytdStart: 672.24  },
+    { symbol: 'ANET',  name: 'Arista Networks', baseline: 159.51,  ytdStart: 131.07  },
+    { symbol: 'ARM',   name: 'ARM Holdings',    baseline: 353.25,  ytdStart: 162.00  },
+    { symbol: 'NET',   name: 'Cloudflare',      baseline: 241.80,  ytdStart: 195.00  },
+    { symbol: 'COIN',  name: 'Coinbase',        baseline: 189.01,  ytdStart: 252.00  },
+    { symbol: 'MELI',  name: 'MercadoLibre',    baseline: 1695.66, ytdStart: 1664.42 },
+    { symbol: 'NU',    name: 'Nu Holdings',     baseline:  13.13,  ytdStart:  16.50  },
   ];
 
   const BENCH = [
-    { symbol: 'PLTR',  name: 'Palantir',         ytdStart: 73.83  },
-    { symbol: 'AXON',  name: 'Axon Enterprise',  ytdStart: 636.99 },
-    { symbol: 'TTD',   name: 'The Trade Desk',   ytdStart: 121.89 },
-    { symbol: 'SNOW',  name: 'Snowflake',        ytdStart: 168.12 },
-    { symbol: 'HIMS',  name: 'Hims & Hers',      ytdStart: 25.79  },
+    { symbol: 'PLTR',  name: 'Palantir',        ytdStart: 73.83   },
+    { symbol: 'AXON',  name: 'Axon Enterprise', ytdStart: 636.99  },
+    { symbol: 'TTD',   name: 'The Trade Desk',  ytdStart: 121.89  },
+    { symbol: 'SNOW',  name: 'Snowflake',       ytdStart: 168.12  },
+    { symbol: 'HIMS',  name: 'Hims & Hers',     ytdStart: 25.79   },
   ];
 
-  // SPY Dec 31 2025 close — used to compute S&P 500 YTD for signal benchmarking
   const SPY_YTD_START = 585.23;
 
   const PROXIES = [
@@ -372,7 +371,6 @@
   function arrow(n) { return n >= 0 ? '▲' : '▼'; }
 
   async function fetchSingleQuote(symbol) {
-    // range=ytd gives full year daily data — first close = actual YTD start, last = current price
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=ytd`;
     for (const makeProxy of PROXIES) {
       try {
@@ -383,8 +381,7 @@
         const meta   = result?.meta;
         if (!meta?.regularMarketPrice) continue;
         const closes = result?.indicators?.quote?.[0]?.close ?? [];
-        const prev   = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
-        // First non-null close in the YTD series = first trading day of the year
+        const prev = meta.regularMarketPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
         const ytdStartPrice = closes.find(c => c != null) ?? null;
         return {
           symbol,
@@ -394,23 +391,16 @@
           fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh ?? null,
           ytdStartLive:     ytdStartPrice,
         };
-      } catch (e) { /* try next proxy */ }
+      } catch (e) { }
     }
     return null;
   }
 
-  // Signal logic
-  // CUT:   down >20% from 52w high AND underperforming S&P YTD by >15%
-  // TRIM:  position weight drifted above 15% of portfolio
-  // ADD:   position weight drifted below 5% of portfolio
-  // WATCH: down >15% from 52w high OR underperforming S&P YTD by >10%
-  // HOLD:  none of the above
   function computeSignal(stock, totalValue, spyYtdPct) {
     const weight = (10000 * (stock.price / stock.baseline)) / totalValue * 100;
     const ytdPct = pct(stock.price, stock.ytdStart);
     const vsMarket = ytdPct - spyYtdPct;
     const fromHigh = stock.fiftyTwoWeekHigh ? pct(stock.price, stock.fiftyTwoWeekHigh) : 0;
-
     if (fromHigh < -20 && vsMarket < -15)
       return { label: 'CUT',   cls: 'sig-cut',   tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
     if (weight > 15)
@@ -490,7 +480,6 @@
       const ytdCls    = colorClass(ytd);
       const barWidth  = Math.min(Math.abs(sinceBase), 100);
       const sig       = computeSignal(s, totalValue, spyYtdPct);
-
       return `<tr class="${i % 2 === 0 ? 'theme-row' : ''}">
         <td><a href="https://finance.yahoo.com/quote/${s.symbol}" target="_blank" rel="noopener" style="text-decoration:none;"><span class="symbol">${s.symbol}</span></a></td>
         <td>${s.name}</td>
@@ -512,20 +501,19 @@
   }
 
   function renderSummary(rows, spyYtdPct) {
-    const totalValue    = rows.reduce((sum, s) => sum + 10000 * (s.price / s.baseline), 0);
+    const totalValue     = rows.reduce((sum, s) => sum + 10000 * (s.price / s.baseline), 0);
     const baselineReturn = pct(totalValue, 100000);
-    const ytdValue      = rows.reduce((sum, s) => sum + 10000 * (s.price / s.ytdStart), 0);
-    const ytdReturn     = pct(ytdValue, 100000);
-    const best          = rows.reduce((a, b) => b.dayChangePct > a.dayChangePct ? b : a, rows[0]);
-    const cutCount      = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'CUT').length;
-    const watchCount    = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'WATCH').length;
+    const ytdValue       = rows.reduce((sum, s) => sum + 10000 * (s.price / s.ytdStart), 0);
+    const ytdReturn      = pct(ytdValue, 100000);
+    const cutCount       = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'CUT').length;
+    const watchCount     = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'WATCH').length;
 
-    document.getElementById('totalValue').textContent    = `$${fmt(totalValue, 0)}`;
-    document.getElementById('totalValue').className      = `card-value ${colorClass(baselineReturn)}`;
+    document.getElementById('totalValue').textContent     = `$${fmt(totalValue, 0)}`;
+    document.getElementById('totalValue').className       = `card-value ${colorClass(baselineReturn)}`;
     document.getElementById('baselineReturn').textContent = `${baselineReturn >= 0 ? '+' : ''}${fmt(baselineReturn)}%`;
-    document.getElementById('baselineReturn').className  = `card-value ${colorClass(baselineReturn)}`;
-    document.getElementById('ytdReturn').textContent     = `${ytdReturn >= 0 ? '+' : ''}${fmt(ytdReturn)}%`;
-    document.getElementById('ytdReturn').className       = `card-value ${colorClass(ytdReturn)}`;
+    document.getElementById('baselineReturn').className   = `card-value ${colorClass(baselineReturn)}`;
+    document.getElementById('ytdReturn').textContent      = `${ytdReturn >= 0 ? '+' : ''}${fmt(ytdReturn)}%`;
+    document.getElementById('ytdReturn').className        = `card-value ${colorClass(ytdReturn)}`;
 
     const alertEl  = document.getElementById('alertCount');
     const alertSub = document.getElementById('alertCountSub');
@@ -542,9 +530,9 @@
     const vsMarket = ytdPct - spyYtdPct;
     const fromHigh = stock.fiftyTwoWeekHigh ? pct(stock.price, stock.fiftyTwoWeekHigh) : 0;
     if (fromHigh > -10 && vsMarket > 5)
-      return { label: 'READY',  cls: 'sig-add',   tip: `${fmt(fromHigh,1)}% from 52w high, +${fmt(vsMarket,1)}% vs S&P` };
+      return { label: 'READY',   cls: 'sig-add',   tip: `${fmt(fromHigh,1)}% from 52w high, +${fmt(vsMarket,1)}% vs S&P` };
     if (fromHigh > -15 && vsMarket > -5)
-      return { label: 'WATCH',  cls: 'sig-watch', tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
+      return { label: 'WATCH',   cls: 'sig-watch', tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
     return         { label: 'NOT YET', cls: 'sig-hold',  tip: `${fmt(fromHigh,1)}% from 52w high, ${fmt(vsMarket,1)}% vs S&P` };
   }
 
