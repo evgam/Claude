@@ -383,7 +383,7 @@
         const meta   = result?.meta;
         if (!meta?.regularMarketPrice) continue;
         const closes = result?.indicators?.quote?.[0]?.close ?? [];
-        const prev   = meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
+        const prev = meta.regularMarketPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice;
         // First non-null close in the YTD series = first trading day of the year
         const ytdStartPrice = closes.find(c => c != null) ?? null;
         return {
