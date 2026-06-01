@@ -324,32 +324,33 @@
 </div>
 
 <div class="footer">
-  Prices via Yahoo Finance &nbsp;·&nbsp; Rebalanced: May 30 2026 (v2 — high growth) &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
+  Prices via Yahoo Finance &nbsp;·&nbsp; Rebalanced: May 30 2026 (v2 &mdash; high growth) &nbsp;·&nbsp; Hypothetical equal-weight portfolio &nbsp;·&nbsp; Not financial advice
+  &nbsp;·&nbsp; <a href="performance.html" style="color:#60a5fa;text-decoration:none;">📈 Robinhood vs VOO chart</a>
 </div>
 
 <script>
   const PORTFOLIO = [
-    { symbol: 'NVDA',  name: 'Nvidia',          baseline: 211.15,  ytdStart: 186.50  },
-    { symbol: 'CRWD',  name: 'CrowdStrike',     baseline: 730.85,  ytdStart: 469.00  },
-    { symbol: 'DDOG',  name: 'Datadog',         baseline: 247.52,  ytdStart: 159.00  },
-    { symbol: 'APP',   name: 'AppLovin',        baseline: 613.02,  ytdStart: 672.24  },
-    { symbol: 'ANET',  name: 'Arista Networks', baseline: 159.51,  ytdStart: 131.07  },
-    { symbol: 'ARM',   name: 'ARM Holdings',    baseline: 353.25,  ytdStart: 162.00  },
-    { symbol: 'NET',   name: 'Cloudflare',      baseline: 241.80,  ytdStart: 195.00  },
-    { symbol: 'COIN',  name: 'Coinbase',        baseline: 189.01,  ytdStart: 252.00  },
-    { symbol: 'MELI',  name: 'MercadoLibre',    baseline: 1695.66, ytdStart: 1664.42 },
-    { symbol: 'NU',    name: 'Nu Holdings',     baseline:  13.13,  ytdStart:  16.50  },
+    { symbol: 'NVDA',  name: 'Nvidia',         baseline: 211.15,  ytdStart: 186.50  },
+    { symbol: 'CRWD',  name: 'CrowdStrike',    baseline: 730.85,  ytdStart: 469.00  },
+    { symbol: 'DDOG',  name: 'Datadog',        baseline: 247.52,  ytdStart: 159.00  },
+    { symbol: 'APP',   name: 'AppLovin',       baseline: 613.02,  ytdStart: 672.24  },
+    { symbol: 'ANET',  name: 'Arista Networks',baseline: 159.51,  ytdStart: 131.07  },
+    { symbol: 'ARM',   name: 'ARM Holdings',   baseline: 353.25,  ytdStart: 162.00  },
+    { symbol: 'NET',   name: 'Cloudflare',     baseline: 241.80,  ytdStart: 195.00  },
+    { symbol: 'COIN',  name: 'Coinbase',       baseline: 189.01,  ytdStart: 252.00  },
+    { symbol: 'MELI',  name: 'MercadoLibre',   baseline: 1695.66, ytdStart: 1664.42 },
+    { symbol: 'NU',    name: 'Nu Holdings',    baseline:  13.13,  ytdStart:  16.50  },
   ];
 
   const BENCH = [
-    { symbol: 'PLTR',  name: 'Palantir',        ytdStart: 73.83   },
-    { symbol: 'AXON',  name: 'Axon Enterprise', ytdStart: 636.99  },
-    { symbol: 'TTD',   name: 'The Trade Desk',  ytdStart: 121.89  },
-    { symbol: 'SNOW',  name: 'Snowflake',       ytdStart: 168.12  },
-    { symbol: 'HIMS',  name: 'Hims & Hers',     ytdStart: 25.79   },
+    { symbol: 'PLTR',  name: 'Palantir',         ytdStart: 73.83  },
+    { symbol: 'AXON',  name: 'Axon Enterprise',  ytdStart: 636.99 },
+    { symbol: 'TTD',   name: 'The Trade Desk',   ytdStart: 121.89 },
+    { symbol: 'SNOW',  name: 'Snowflake',        ytdStart: 168.12 },
+    { symbol: 'HIMS',  name: 'Hims & Hers',      ytdStart: 25.79  },
   ];
 
-  // Fallback SPY Dec 31 2025 close if live fetch fails
+  // SPY Dec 31 2025 close — used to compute S&P 500 YTD for signal benchmarking
   const SPY_YTD_START = 585.23;
 
   const PROXIES = [
@@ -515,6 +516,7 @@
     const baselineReturn = pct(totalValue, 100000);
     const ytdValue      = rows.reduce((sum, s) => sum + 10000 * (s.price / s.ytdStart), 0);
     const ytdReturn     = pct(ytdValue, 100000);
+    const best          = rows.reduce((a, b) => b.dayChangePct > a.dayChangePct ? b : a, rows[0]);
     const cutCount      = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'CUT').length;
     const watchCount    = rows.filter(s => computeSignal(s, totalValue, spyYtdPct).label === 'WATCH').length;
 
