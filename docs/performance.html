@@ -399,17 +399,20 @@
     const rhRet   = (lastRH  - STARTING_VALUE) / STARTING_VALUE * 100;
     const vooRet  = (lastVOO - STARTING_VALUE) / STARTING_VALUE * 100;
 
-    document.getElementById('rhValue').textContent  = '$' + fmt(lastRH);
-    document.getElementById('rhValue').className    = 'card-value ' + (rhRet >= 0 ? 'pos' : 'neg');
-    document.getElementById('rhSub').textContent    = (rhRet >= 0 ? '+' : '') + rhRet.toFixed(1) + '% vs $190K start';
+    const RH_ACTUAL = 295214;
+    const rhActualRet = (RH_ACTUAL - STARTING_VALUE) / STARTING_VALUE * 100;
+    document.getElementById('rhValue').textContent  = '$295,214';
+    document.getElementById('rhValue').className    = 'card-value pos';
+    document.getElementById('rhSub').textContent    = '+' + rhActualRet.toFixed(1) + '% vs $190K start';
 
     document.getElementById('vooValue').textContent = '$' + fmt(lastVOO);
     document.getElementById('vooValue').className   = 'card-value ' + (vooRet >= 0 ? 'pos' : 'neg');
     document.getElementById('vooSub').textContent   = (vooRet >= 0 ? '+' : '') + vooRet.toFixed(1) + '% return';
 
-    document.getElementById('alphaValue').textContent = (diff >= 0 ? '+$' : '-$') + fmt(Math.abs(diff));
-    document.getElementById('alphaValue').className   = 'card-value ' + (diff >= 0 ? 'pos' : 'neg');
-    document.getElementById('alphaSub').textContent   = (diff >= 0 ? 'ahead of' : 'behind') + ' VOO · ' + (diff / lastVOO * 100).toFixed(1) + '%';
+    const actualDiff = RH_ACTUAL - lastVOO;
+    document.getElementById('alphaValue').textContent = (actualDiff >= 0 ? '+$' : '-$') + fmt(Math.abs(actualDiff));
+    document.getElementById('alphaValue').className   = 'card-value ' + (actualDiff >= 0 ? 'pos' : 'neg');
+    document.getElementById('alphaSub').textContent   = (actualDiff >= 0 ? 'ahead of' : 'behind') + ' VOO · ' + (actualDiff / lastVOO * 100).toFixed(1) + '%';
 
     document.getElementById('contribValue').textContent = '$' + fmt(totalContributed);
     document.getElementById('contribValue').className   = 'card-value';
