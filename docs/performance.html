@@ -58,8 +58,8 @@
 <div class="cards">
   <div class="card">
     <div class="card-label">Robinhood Retirement</div>
-    <div class="card-value pos">$297,062</div>
-    <div class="card-sub">+56.3% vs $190K start</div>
+    <div class="card-value pos">$294,079</div>
+    <div class="card-sub">+54.8% vs $190K start</div>
   </div>
   <div class="card">
     <div class="card-label">VOO (same contributions)</div>
@@ -88,17 +88,17 @@
 </div>
 
 <div class="holdings-wrap">
-  <div class="holdings-title">Holdings — as of Jun 2, 2026</div>
+  <div class="holdings-title">Holdings — as of Jun 3, 2026</div>
   <table class="holdings-table">
     <thead><tr><th>Symbol</th><th>Shares</th><th>Price</th><th>Value</th><th>Allocation</th></tr></thead>
     <tbody>
-      <tr><td>VGT</td><td>1,302.274</td><td>$125.77</td><td>$163,787</td><td>55.1%</td></tr>
-      <tr><td>VT</td><td>331.490</td><td>$159.35</td><td>$52,821</td><td>17.8%</td></tr>
-      <tr><td>AVGO</td><td>50.523</td><td>$481.54</td><td>$24,329</td><td>8.2%</td></tr>
-      <tr><td>NVDA</td><td>104.659</td><td>$222.81</td><td>$23,319</td><td>7.9%</td></tr>
-      <tr><td>GOOGL</td><td>61.773</td><td>$361.84</td><td>$22,352</td><td>7.5%</td></tr>
-      <tr><td>FBTC</td><td>178.750</td><td>$58.48</td><td>$10,453</td><td>3.5%</td></tr>
-      <tr><td>Total</td><td></td><td></td><td>$297,062</td><td>100%</td></tr>
+      <tr><td>VGT</td><td>1,303.465</td><td>$124.15</td><td>$161,825</td><td>55.0%</td></tr>
+      <tr><td>VT</td><td>331.490</td><td>$158.20</td><td>$52,442</td><td>17.8%</td></tr>
+      <tr><td>AVGO</td><td>50.523</td><td>$487.08</td><td>$24,609</td><td>8.4%</td></tr>
+      <tr><td>NVDA</td><td>104.659</td><td>$215.62</td><td>$22,567</td><td>7.7%</td></tr>
+      <tr><td>GOOGL</td><td>61.773</td><td>$360.25</td><td>$22,254</td><td>7.6%</td></tr>
+      <tr><td>FBTC</td><td>181.333</td><td>$57.26</td><td>$10,383</td><td>3.5%</td></tr>
+      <tr><td>Total</td><td></td><td></td><td>$294,079</td><td>100%</td></tr>
     </tbody>
   </table>
 </div>
@@ -114,15 +114,15 @@
 <script>
   const HOLDINGS = [
     { symbol: 'NVDA',  qty: 44.127883  + 60.531271   },
-    { symbol: 'FBTC',  qty: 121.419880 + 57.329832   },
-    { symbol: 'VGT',   qty: 74.400845  + 1227.873698 },
+    { symbol: 'FBTC',  qty: 124.003414 + 57.329832   },
+    { symbol: 'VGT',   qty: 75.591699  + 1227.873698 },
     { symbol: 'AVGO',  qty: 22.367559  + 28.155878   },
     { symbol: 'GOOGL', qty: 26.309530  + 35.463820   },
     { symbol: 'VT',    qty: 0          + 331.490412  },
   ];
 
   const STARTING_VALUE = 190000;
-  const RH_ACTUAL      = 297062;
+  const RH_ACTUAL      = 294079;
   const START_DATE_STR = '2025-01-02';
 
   const CONTRIBUTIONS = [];
@@ -166,22 +166,17 @@
   async function buildChart() {
     const dot  = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
-
     const symbols = [...HOLDINGS.map(h => h.symbol), 'VOO'];
     const results = await Promise.all(symbols.map(fetchHistory));
     const historyMap = {};
     symbols.forEach((sym, i) => { historyMap[sym] = results[i]; });
-
     if (symbols.every(s => !historyMap[s])) { dot.className='status-dot error'; text.textContent='Could not load data — try refreshing'; return; }
-
     const allDates = Object.keys(historyMap['VOO'] || {}).sort();
     const dates = allDates.filter(d => d >= START_DATE_STR);
     if (dates.length < 5) { dot.className='status-dot error'; text.textContent='Not enough historical data loaded'; return; }
-
     let vooShares=null, normRH=null;
     const rhSeries=[], vooSeries=[];
     const contribDone = new Set();
-
     dates.forEach(date => {
       CONTRIBUTIONS.forEach(c => {
         if (contribDone.has(c.date)) return;
@@ -200,11 +195,9 @@
       rhSeries.push( { x: date, y: (portVal/normRH)*STARTING_VALUE });
       vooSeries.push({ x: date, y: vooShares*vooPrice });
     });
-
     const lastVOO = vooSeries[vooSeries.length-1]?.y ?? 0;
     const vooRet  = (lastVOO - STARTING_VALUE) / STARTING_VALUE * 100;
     const diff    = RH_ACTUAL - lastVOO;
-
     document.getElementById('vooValue').textContent = '$' + fmt(lastVOO);
     document.getElementById('vooValue').className   = 'card-value ' + (vooRet >= 0 ? 'pos' : 'neg');
     document.getElementById('vooSub').textContent   = (vooRet >= 0 ? '+' : '') + vooRet.toFixed(1) + '% return';
@@ -215,7 +208,6 @@
     document.getElementById('contribValue').className   = 'card-value';
     dot.className = 'status-dot';
     text.textContent = `${dates.length} trading days · prices via Yahoo Finance`;
-
     const annotations = {};
     CONTRIBUTIONS.forEach((c, i) => {
       const tDay = nearestTradingDay(c.date, dates);
@@ -225,7 +217,6 @@
         : { enabled: false };
       annotations['contrib_'+i] = { type:'line', xMin:tDay, xMax:tDay, borderColor:'rgba(74,222,128,0.18)', borderWidth:1, label };
     });
-
     const ctx = document.getElementById('perfChart').getContext('2d');
     new Chart(ctx, {
       type: 'line',
@@ -251,7 +242,6 @@
       },
     });
   }
-
   buildChart();
 </script>
 </body>
