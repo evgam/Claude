@@ -128,7 +128,8 @@
   const CONTRIBUTIONS = [];
   for (let m = 0; m < 12; m++) { const d = new Date(2025, m, 1); CONTRIBUTIONS.push({ date: d.toISOString().slice(0,10), amount: 7000/12 }); }
   for (let m = 0; m < 12; m++) { const d = new Date(2026, m, 1); CONTRIBUTIONS.push({ date: d.toISOString().slice(0,10), amount: 820/12 }); }
-  const totalContributed = STARTING_VALUE + 7000 + 820;
+  for (let m = 0; m < 12; m++) { const d = new Date(2027, m, 1); CONTRIBUTIONS.push({ date: d.toISOString().slice(0,10), amount: 2800/12 }); }
+  const totalContributed = STARTING_VALUE + 7000 + 820 + 2800;
 
   const PROXIES = [
     u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
