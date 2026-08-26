@@ -76,6 +76,11 @@
     <div class="card-value loading" id="contribValue">—</div>
     <div class="card-sub">$190K start + Roth adds</div>
   </div>
+  <div class="card">
+    <div class="card-label">2026 YTD</div>
+    <div class="card-value pos" id="ytdValue">—</div>
+    <div class="card-sub" id="ytdSub">vs Dec 31, 2025</div>
+  </div>
 </div>
 
 <div class="chart-wrap">
@@ -123,6 +128,7 @@
 
   const STARTING_VALUE = 190000;
   const RH_ACTUAL      = 281286;
+  const DEC31_2025     = 240080;
   const START_DATE_STR = '2025-01-02';
 
   const CONTRIBUTIONS = [];
@@ -207,6 +213,11 @@
     document.getElementById('alphaSub').textContent   = (diff >= 0 ? 'ahead of' : 'behind') + ' VOO · ' + (diff/lastVOO*100).toFixed(1) + '%';
     document.getElementById('contribValue').textContent = '$' + fmt(totalContributed);
     document.getElementById('contribValue').className   = 'card-value';
+    const ytd = RH_ACTUAL - DEC31_2025;
+    const ytdPct = ytd / DEC31_2025 * 100;
+    document.getElementById('ytdValue').textContent = (ytd >= 0 ? '+$' : '-$') + fmt(Math.abs(ytd));
+    document.getElementById('ytdValue').className   = 'card-value ' + (ytd >= 0 ? 'pos' : 'neg');
+    document.getElementById('ytdSub').textContent   = (ytdPct >= 0 ? '+' : '') + ytdPct.toFixed(1) + '% since Dec 31, 2025';
     dot.className = 'status-dot';
     text.textContent = `${dates.length} trading days · prices via Yahoo Finance`;
     const annotations = {};
