@@ -81,6 +81,11 @@
     <div class="card-value pos" id="ytdValue">—</div>
     <div class="card-sub" id="ytdSub">vs Dec 31, 2025</div>
   </div>
+  <div class="card">
+    <div class="card-label">VOO 2026 YTD</div>
+    <div class="card-value loading" id="vooYtdValue">—</div>
+    <div class="card-sub" id="vooYtdSub">vs Dec 31, 2025</div>
+  </div>
 </div>
 
 <div class="chart-wrap">
@@ -218,6 +223,14 @@
     document.getElementById('ytdValue').textContent = (ytd >= 0 ? '+$' : '-$') + fmt(Math.abs(ytd));
     document.getElementById('ytdValue').className   = 'card-value ' + (ytd >= 0 ? 'pos' : 'neg');
     document.getElementById('ytdSub').textContent   = (ytdPct >= 0 ? '+' : '') + ytdPct.toFixed(1) + '% since Dec 31, 2025';
+    const dec31Entry = vooSeries.filter(p => p.x <= '2025-12-31').slice(-1)[0];
+    if (dec31Entry) {
+      const vooYtd = lastVOO - dec31Entry.y;
+      const vooYtdPct = vooYtd / dec31Entry.y * 100;
+      document.getElementById('vooYtdValue').textContent = (vooYtd >= 0 ? '+$' : '-$') + fmt(Math.abs(vooYtd));
+      document.getElementById('vooYtdValue').className   = 'card-value ' + (vooYtd >= 0 ? 'pos' : 'neg');
+      document.getElementById('vooYtdSub').textContent   = (vooYtdPct >= 0 ? '+' : '') + vooYtdPct.toFixed(1) + '% since Dec 31, 2025';
+    }
     dot.className = 'status-dot';
     text.textContent = `${dates.length} trading days · prices via Yahoo Finance`;
     const annotations = {};
