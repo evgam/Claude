@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robinhood vs VOO</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0e1a; color: #e2e8f0; min-height: 100vh; padding: 24px 16px; }
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 1.8rem; font-weight: 700; background: linear-gradient(135deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  header .subtitle { color: #64748b; font-size: 0.82rem; margin-top: 4px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .meta-row { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 10px; font-size: 0.8rem; color: #475569; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; display: inline-block; animation: pulse 2s infinite; }
+  .status-dot.loading { background: #f59e0b; }
+  .status-dot.error   { background: #ef4444; animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; max-width: 1000px; margin: 0 auto 28px; }
+  .card { background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 16px 20px; }
+  .card-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+  .card-value { font-size: 1.5rem; font-weight: 700; color: #f1f5f9; }
+  .card-value.pos { color: #4ade80; }
+  .card-value.neg { color: #f87171; }
+  .card-value.loading { color: #334155; }
+  .card-sub { font-size: 0.72rem; color: #475569; margin-top: 3px; }
+  .chart-wrap { max-width: 1000px; margin: 0 auto; background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 24px; }
+  .chart-container { position: relative; height: 440px; }
+  .legend { display: flex; justify-content: center; gap: 28px; margin-bottom: 20px; font-size: 0.82rem; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-swatch { width: 28px; height: 3px; border-radius: 2px; }
+  .legend-tick { width: 2px; height: 14px; border-radius: 1px; }
+  .footer { text-align: center; margin-top: 24px; font-size: 0.7rem; color: #334155; }
+  .note { text-align: center; font-size: 0.72rem; color: #475569; margin-top: 14px; }
+  .holdings-wrap { max-width: 1000px; margin: 28px auto 0; background: #111827; border: 1px solid #1e293b; border-radius: 14px; padding: 20px 24px; }
+  .holdings-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .6px; color: #64748b; margin-bottom: 14px; }
+  .holdings-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .holdings-table th { text-align: right; color: #475569; font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: .5px; padding: 0 10px 8px; border-bottom: 1px solid #1e293b; }
+  .holdings-table th:first-child { text-align: left; }
+  .holdings-table td { text-align: right; padding: 9px 10px; border-bottom: 1px solid #0f172a; color: #cbd5e1; font-variant-numeric: tabular-nums; }
+  .holdings-table td:first-child { text-align: left; font-weight: 600; color: #f1f5f9; }
+  .holdings-table tr:last-child td { border-bottom: none; font-weight: 700; color: #f1f5f9; }
+  .holdings-table-wrap { overflow-x: auto; }
+</style>
+
+<header>
+  <h1>Robinhood Retirement vs VOO</h1>
+  <div class="subtitle">Performance since Jan 2, 2025 · Both start at $190,000 + same contributions</div>
+  <div class="meta-row">
+    <span><span class="status-dot loading" id="statusDot"></span></span>
+    <span id="statusText">Loading historical data…</span>
+  </div>
+</header>
+
+<div class="cards">
+  <div class="card">
+    <div class="card-label">Robinhood Retirement</div>
+    <div class="card-value pos">$300,577</div>
+    <div class="card-sub">+58.2% vs $190K start</div>
+  </div>
+  <div class="card">
+    <div class="card-label">VOO (same contributions)</div>
+    <div class="card-value loading" id="vooValue">—</div>
+    <div class="card-sub" id="vooSub">$190K + monthly Roth adds</div>
+  </div>
+  <div class="card">
+    <div class="card-label">You vs VOO</div>
+    <div class="card-value loading" id="alphaValue">—</div>
+    <div class="card-sub" id="alphaSub">dollar difference</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total Contributed</div>
+    <div class="card-value loading" id="contribValue">—</div>
+    <div class="card-sub">$190K start + Roth adds</div>
+  </div>
+  <div class="card">
+    <div class="card-label">2026 YTD</div>
+    <div class="card-value pos" id="ytdValue">—</div>
+    <div class="card-sub" id="ytdSub">vs Dec 31, 2025</div>
+  </div>
+  <div class="card">
+    <div class="card-label">VOO 2026 YTD</div>
+    <div class="card-value loading" id="vooYtdValue">—</div>
+    <div class="card-sub" id="vooYtdSub">vs Dec 31, 2025</div>
+  </div>
+</div>
+
+<div class="chart-wrap">
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:#60a5fa;"></div><span style="color:#60a5fa;font-weight:600;">Robinhood Retirement</span></div>
+    <div class="legend-item"><div class="legend-swatch" style="background:#a78bfa;border-top:2px dashed #a78bfa;height:0;"></div><span style="color:#a78bfa;font-weight:600;">VOO (same cash)</span></div>
+    <div class="legend-item"><div class="legend-tick" style="background:#4ade8066;"></div><span style="color:#4ade80;opacity:.7;">Roth contribution</span></div>
+  </div>
+  <div class="chart-container"><canvas id="perfChart"></canvas></div>
+</div>
+
+<div class="holdings-wrap">
+  <div class="holdings-title">Holdings — as of Oct 6, 2026</div>
+  <div class="holdings-table-wrap">
+    <table class="holdings-table">
+      <thead><tr><th>Symbol</th><th>Shares</th><th>Price</th><th>Value</th><th>Allocation</th></tr></thead>
+      <tbody>
+        <tr><td>VGT</td><td>1,279.839</td><td>$129.80</td><td>$166,123</td><td>55.3%</td></tr>
+        <tr><td>VT</td><td>364.511</td><td>$160.70</td><td>$58,577</td><td>19.5%</td></tr>
+        <tr><td>NVDA</td><td>90.288</td><td>$239.24</td><td>$21,600</td><td>7.2%</td></tr>
+        <tr><td>GOOGL</td><td>61.849</td><td>$347.68</td><td>$21,504</td><td>7.2%</td></tr>
+        <tr><td>AVGO</td><td>51.268</td><td>$375.81</td><td>$19,267</td><td>6.4%</td></tr>
+        <tr><td>FBTC</td><td>181.333</td><td>$74.48</td><td>$13,506</td><td>4.5%</td></tr>
+        <tr><td>Total</td><td></td><td></td><td>$300,577</td><td>100%</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<p class="note">
+  Robinhood line uses current share quantities × historical prices (approximation).<br>
+  VOO line mirrors your exact contribution schedule — $190K on Jan 2, 2025 + equal monthly Roth adds.<br>
+  Prices via Yahoo Finance.
+</p>
+
+<div class="footer">Robinhood IRA accounts (Roth + Traditional) · Not financial advice</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script>
+  const HOLDINGS = [
+    { symbol: 'NVDA',  qty: 43.387732  + 46.900049   },
+    { symbol: 'FBTC',  qty: 124.003414 + 57.329832   },
+    { symbol: 'VGT',   qty: 77.978838  + 1201.860480 },
+    { symbol: 'AVGO',  qty: 23.010859  + 28.257249   },
+    { symbol: 'GOOGL', qty: 26.341913  + 35.507474   },
+    { symbol: 'VT',    qty: 0          + 364.511369  },
+  ];
+
+  const STARTING_VALUE = 190000;
+  const RH_ACTUAL      = 300577;
+  const DEC31_2025     = 240080;
+  const START_DATE_STR = '2025-01-02';
+
+  const CONTRIBUTIONS = [];
+  for (let m = 0; m < 12; m++) { const d = new Date(2025, m, 1); CONTRIBUTIONS.push({ date: d.toISOString().slice(0,10), amount: 7000/12 }); }
+  for (let m = 0; m < 12; m++) { const d = new Date(2026, m, 1); CONTRIBUTIONS.push({ date: d.toISOString().slice(0,10), amount: 1130/12 }); }
+  for (let m = 0; m < 12; m++) { const d = new Date(2027, m, 1); CONTRIBUTIONS.push({ date: d.toISOString().slice(0,10), amount: 2800/12 }); }
+  const totalContributed = STARTING_VALUE + 7000 + 1130 + 2800;
+
+  const VOO_HISTORY = {"2025-01-02":537.4600,"2025-01-03":544.4000,"2025-01-06":547.5700,"2025-01-07":541.4100,"2025-01-08":542.1400,"2025-01-10":533.8900,"2025-01-13":534.5800,"2025-01-14":535.2600,"2025-01-15":545.0500,"2025-01-16":544.2400,"2025-01-17":549.4600,"2025-01-21":554.4600,"2025-01-22":557.6100,"2025-01-23":560.7000,"2025-01-24":559.0100,"2025-01-27":551.2300,"2025-01-28":555.8500,"2025-01-29":553.4100,"2025-01-30":556.3000,"2025-01-31":553.3300,"2025-02-03":549.7000,"2025-02-04":553.3500,"2025-02-05":555.6200,"2025-02-06":557.6200,"2025-02-07":552.2000,"2025-02-10":556.1500,"2025-02-11":556.6500,"2025-02-12":554.8100,"2025-02-13":560.6700,"2025-02-14":560.6900,"2025-02-18":562.3100,"2025-02-19":563.6700,"2025-02-20":561.3000,"2025-02-21":551.7500,"2025-02-24":549.1400,"2025-02-25":546.4100,"2025-02-26":546.7500,"2025-02-27":537.9700,"2025-02-28":546.3300,"2025-03-03":536.9200,"2025-03-04":530.4500,"2025-03-05":536.4000,"2025-03-06":526.6700,"2025-03-07":529.5100,"2025-03-10":515.5100,"2025-03-11":511.2800,"2025-03-12":513.7600,"2025-03-13":507.0500,"2025-03-14":517.4600,"2025-03-17":521.4100,"2025-03-18":515.9100,"2025-03-19":521.3300,"2025-03-20":520.1300,"2025-03-21":520.2600,"2025-03-24":529.3900,"2025-03-25":530.6500,"2025-03-26":524.4600,"2025-03-27":521.2100,"2025-03-28":510.8000,"2025-03-31":513.9100,"2025-04-01":515.8000,"2025-04-02":518.9100,"2025-04-03":494.1600,"2025-04-04":465.5200,"2025-04-07":463.5600,"2025-04-08":456.7400,"2025-04-09":499.1000,"2025-04-10":482.0600,"2025-04-11":490.5500,"2025-04-14":495.4800,"2025-04-15":494.0900,"2025-04-16":483.2300,"2025-04-17":483.9000,"2025-04-21":472.3700,"2025-04-22":484.2900,"2025-04-23":492.0700,"2025-04-24":502.4100,"2025-04-25":506.1100,"2025-04-28":506.4200,"2025-04-29":509.4900,"2025-04-30":509.7400,"2025-05-01":513.3500,"2025-05-02":520.7100,"2025-05-05":517.9900,"2025-05-06":513.5800,"2025-05-07":515.9000,"2025-05-08":519.3400,"2025-05-09":518.6500,"2025-05-12":535.9200,"2025-05-13":539.4400,"2025-05-14":540.1100,"2025-05-15":542.7600,"2025-05-16":546.2600,"2025-05-19":546.8200,"2025-05-20":544.8800,"2025-05-21":535.7700,"2025-05-22":536.0200,"2025-05-23":532.4000,"2025-05-27":543.3400,"2025-05-28":540.2400,"2025-05-29":542.3200,"2025-05-30":541.7600,"2025-06-02":544.9100,"2025-06-03":548.0000,"2025-06-04":547.6500,"2025-06-05":545.0900,"2025-06-06":550.6600,"2025-06-09":551.2500,"2025-06-10":554.3900,"2025-06-11":552.8600,"2025-06-12":554.9500,"2025-06-13":548.7700,"2025-06-16":554.0700,"2025-06-17":549.3500,"2025-06-18":549.2400,"2025-06-20":547.7200,"2025-06-23":553.3600,"2025-06-24":559.4400,"2025-06-25":559.7200,"2025-06-26":564.1500,"2025-06-27":566.9500,"2025-06-30":568.0300,"2025-07-01":567.7700,"2025-07-02":570.2900,"2025-07-03":575.2200,"2025-07-07":570.6100,"2025-07-08":570.2300,"2025-07-09":573.6100,"2025-07-10":575.2900,"2025-07-11":573.2200,"2025-07-14":574.3500,"2025-07-15":571.8600,"2025-07-16":573.7400,"2025-07-17":577.1800,"2025-07-18":576.9200,"2025-07-21":577.9500,"2025-07-22":577.9500,"2025-07-23":582.8600,"2025-07-24":583.2600,"2025-07-25":585.5800,"2025-07-28":585.4400,"2025-07-29":583.9200,"2025-07-30":583.2100,"2025-07-31":581.0200,"2025-08-01":571.4500,"2025-08-04":580.1400,"2025-08-05":577.3500,"2025-08-06":581.6400,"2025-08-07":581.2900,"2025-08-08":585.7400,"2025-08-11":584.5400,"2025-08-12":590.7800,"2025-08-13":592.8400,"2025-08-14":592.8500,"2025-08-15":591.5700,"2025-08-18":591.3600,"2025-08-19":588.1300,"2025-08-20":586.5800,"2025-08-21":584.2700,"2025-08-22":593.2100,"2025-08-25":590.7000,"2025-08-26":593.0600,"2025-08-27":594.4200,"2025-08-28":596.5200,"2025-08-29":593.0800,"2025-09-02":588.7100,"2025-09-03":591.7200,"2025-09-04":596.5900,"2025-09-05":594.9600,"2025-09-08":596.5000,"2025-09-09":597.9500,"2025-09-10":599.6800,"2025-09-11":604.5700,"2025-09-12":604.4400,"2025-09-15":607.5900,"2025-09-16":606.7900,"2025-09-17":606.0900,"2025-09-18":608.9400,"2025-09-19":611.7800,"2025-09-22":614.7600,"2025-09-23":611.5400,"2025-09-24":609.5000,"2025-09-25":606.5900,"2025-09-26":610.1600,"2025-09-29":610.1300,"2025-09-30":612.3800,"2025-10-01":614.5700,"2025-10-02":615.2500,"2025-10-03":615.3000,"2025-10-06":617.4000,"2025-10-07":615.2000,"2025-10-08":618.7700,"2025-10-09":617.1000,"2025-10-10":600.5100,"2025-10-13":609.6100,"2025-10-14":608.7500,"2025-10-15":611.4300,"2025-10-16":607.3900,"2025-10-17":610.7600,"2025-10-20":617.1700,"2025-10-21":617.0900,"2025-10-22":613.9700,"2025-10-23":617.4400,"2025-10-24":622.5500,"2025-10-27":630.0000,"2025-10-28":631.6900,"2025-10-29":631.9500,"2025-10-30":625.2400,"2025-10-31":627.0400,"2025-11-03":628.2700,"2025-11-04":620.9900,"2025-11-05":622.8600,"2025-11-06":616.2400,"2025-11-07":616.8900,"2025-11-10":626.4700,"2025-11-11":627.9100,"2025-11-12":628.2200,"2025-11-13":617.9900,"2025-11-14":617.8300,"2025-11-17":612.0400,"2025-11-18":607.0000,"2025-11-19":609.2000,"2025-11-20":599.9600,"2025-11-21":605.9300,"2025-11-24":614.9400,"2025-11-25":620.6600,"2025-11-26":624.9500,"2025-11-28":628.4100,"2025-12-01":625.5200,"2025-12-02":626.5800,"2025-12-03":628.7700,"2025-12-04":629.3000,"2025-12-05":630.4800,"2025-12-08":628.6100,"2025-12-09":628.1000,"2025-12-10":632.1600,"2025-12-11":633.7100,"2025-12-12":626.8700,"2025-12-15":625.9600,"2025-12-16":624.2100,"2025-12-17":617.3500,"2025-12-18":622.0100,"2025-12-19":627.5600,"2025-12-22":629.7300,"2025-12-23":632.6700,"2025-12-24":634.7800,"2025-12-26":634.8400,"2025-12-29":632.6000,"2025-12-30":631.7200,"2025-12-31":627.1300,"2026-01-02":628.3000,"2026-01-05":632.4600,"2026-01-06":636.2100,"2026-01-07":634.1700,"2026-01-08":634.0600,"2026-01-09":638.3100,"2026-01-12":639.3400,"2026-01-13":638.0300,"2026-01-14":634.9400,"2026-01-15":636.6200,"2026-01-16":636.0900,"2026-01-20":623.1500,"2026-01-21":630.2900,"2026-01-22":633.5700,"2026-01-23":633.8300,"2026-01-26":637.0900,"2026-01-27":639.7000,"2026-01-28":639.6000,"2026-01-29":638.2700,"2026-01-30":636.2200,"2026-02-02":639.6800,"2026-02-03":634.1500,"2026-02-04":630.9100,"2026-02-05":623.1000,"2026-02-06":635.2400,"2026-02-09":638.2300,"2026-02-10":636.4400,"2026-02-11":636.3500,"2026-02-12":626.4900,"2026-02-13":626.8900,"2026-02-17":627.9900,"2026-02-18":631.1500,"2026-02-19":629.5300,"2026-02-20":634.0200,"2026-02-23":627.6300,"2026-02-24":632.2100,"2026-02-25":637.5300,"2026-02-26":633.9500,"2026-02-27":631.0400,"2026-03-02":631.2800,"2026-03-03":625.7200,"2026-03-04":630.1800,"2026-03-05":626.8100,"2026-03-06":618.4300,"2026-03-09":623.8000,"2026-03-10":622.7200,"2026-03-11":622.0300,"2026-03-12":612.5000,"2026-03-13":609.0900,"2026-03-16":615.1900,"2026-03-17":616.8900,"2026-03-18":608.3800,"2026-03-19":606.7500,"2026-03-20":597.9400,"2026-03-23":604.4300,"2026-03-24":602.3800,"2026-03-25":605.6600,"2026-03-26":594.9200,"2026-03-27":582.9600,"2026-03-30":580.9300,"2026-03-31":597.5500,"2026-04-01":602.3000,"2026-04-02":602.9900,"2026-04-06":605.6700,"2026-04-07":606.0400,"2026-04-08":621.3400,"2026-04-09":625.0200,"2026-04-10":624.6000,"2026-04-13":630.7200,"2026-04-14":638.3500,"2026-04-15":643.4500,"2026-04-16":644.8600,"2026-04-17":652.7800,"2026-04-20":651.5400,"2026-04-21":647.2500,"2026-04-22":653.9000,"2026-04-23":651.2600,"2026-04-24":656.4200,"2026-04-27":657.5000,"2026-04-28":654.2600,"2026-04-29":654.2400,"2026-04-30":660.5800,"2026-05-01":662.5200,"2026-05-04":660.1200,"2026-05-05":665.3000,"2026-05-06":674.6600,"2026-05-07":672.5400,"2026-05-08":678.0400,"2026-05-11":679.5200,"2026-05-12":678.6700,"2026-05-13":682.4100,"2026-05-14":687.7300,"2026-05-15":679.4400,"2026-05-18":678.9100,"2026-05-19":674.5900,"2026-05-20":681.5700,"2026-05-21":682.8400,"2026-05-22":685.5500,"2026-05-26":690.0100,"2026-05-27":689.9600,"2026-05-28":693.9100,"2026-05-29":695.4900,"2026-06-01":697.3000,"2026-06-02":698.2600,"2026-06-03":693.3600,"2026-06-04":696.0600,"2026-06-05":678.0000,"2026-06-08":679.6800,"2026-06-09":677.7000,"2026-06-10":667.0500,"2026-06-11":678.2300,"2026-06-12":681.9500,"2026-06-15":693.8300,"2026-06-16":689.7500,"2026-06-17":681.4100,"2026-06-18":688.1100,"2026-06-22":686.1000,"2026-06-23":676.3400,"2026-06-24":675.6900,"2026-06-25":675.7100,"2026-06-26":670.2600,"2026-06-29":681.0100,"2026-06-30":686.8100,"2026-07-01":685.4600,"2026-07-02":684.8400,"2026-07-06":690.6200,"2026-07-07":687.0800,"2026-07-08":685.2600,"2026-07-09":690.6900,"2026-07-10":693.8600,"2026-07-13":688.5000,"2026-07-14":691.1000,"2026-07-15":693.8000,"2026-07-16":690.1400,"2026-07-17":683.1700,"2026-07-20":682.2100,"2026-07-21":687.8700,"2026-07-22":687.0300,"2026-07-23":678.6100,"2026-07-24":679.1400,"2026-07-27":679.3100,"2026-07-28":680.9600,"2026-07-29":670.6300,"2026-07-30":681.7900,"2026-07-31":686.6500,"2026-08-03":696.4000,"2026-08-04":708.9800,"2026-08-05":707.6000,"2026-08-06":706.4000,"2026-08-07":710.7100,"2026-08-10":710.6500,"2026-08-11":708.4200,"2026-08-12":710.1700,"2026-08-13":714.9500,"2026-08-14":713.6100,"2026-08-17":710.2700,"2026-08-18":705.4000,"2026-08-19":706.9100,"2026-08-20":701.0100,"2026-08-21":703.7100,"2026-08-24":701.8300,"2026-08-25":704.0200,"2026-08-26":704.2000,"2026-08-27":708.7500,"2026-08-28":707.2400,"2026-08-31":704.8900,"2026-09-01":700.2800,"2026-09-02":703.4100,"2026-09-03":710.7200,"2026-09-04":708.0100,"2026-09-08":704.0700,"2026-09-09":700.8700,"2026-09-10":696.6500,"2026-09-11":702.5600,"2026-09-14":699.3000,"2026-09-15":696.2000,"2026-09-16":693.2400,"2026-09-17":701.0300,"2026-09-18":701.7800,"2026-09-21":712.7800,"2026-09-22":712.7800,"2026-09-23":707.6000,"2026-09-24":706.9900,"2026-09-25":710.7900,"2026-09-28":703.6100,"2026-09-29":702.4600,"2026-09-30":700.8600,"2026-10-01":702.3500,"2026-10-02":707.5400,"2026-10-05":712.3200,"2026-10-06":716.2000};
+
+  const PROXIES = [
+    u => `https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+    u => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+    u => `https://thingproxy.freeboard.io/fetch/${u}`,
+    u => `https://proxy.cors.sh/${u}`,
+  ];
+
+  async function fetchHistory(symbol) {
+    const urls = [
+      `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2y`,
+      `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=2y`,
+    ];
+    for (const url of urls) {
+      for (const proxy of PROXIES) {
+        try {
+          const res = await fetch(proxy(url));
+          if (!res.ok) continue;
+          const json = await res.json();
+          const result = json?.chart?.result?.[0];
+          if (!result) continue;
+          const timestamps = result.timestamps ?? result.timestamp ?? [];
+          const closes = result.indicators?.quote?.[0]?.close ?? [];
+          const map = {};
+          timestamps.forEach((ts, i) => { if (closes[i] != null) { map[new Date(ts*1000).toISOString().slice(0,10)] = closes[i]; } });
+          if (Object.keys(map).length > 10) return map;
+        } catch (e) {}
+      }
+    }
+    return null;
+  }
+
+  function nearestTradingDay(dateStr, sortedDates) {
+    if (sortedDates.includes(dateStr)) return dateStr;
+    return sortedDates.find(d => d >= dateStr) ?? null;
+  }
+
+  function fmt(n, dec=0) { return n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+
+  async function buildChart() {
+    const dot  = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    const symbols = HOLDINGS.map(h => h.symbol);
+    const results = await Promise.all(symbols.map(fetchHistory));
+    const historyMap = { 'VOO': VOO_HISTORY };
+    symbols.forEach((sym, i) => { historyMap[sym] = results[i]; });
+    if (symbols.every(s => !historyMap[s])) { dot.className='status-dot error'; text.innerHTML='Could not load chart data — <a href="" style="color:#60a5fa">retry</a>'; return; }
+    const allDates = Object.keys(historyMap['VOO'] || {}).sort();
+    const dates = allDates.filter(d => d >= START_DATE_STR);
+    if (dates.length < 5) { dot.className='status-dot error'; text.textContent='Not enough historical data loaded'; return; }
+    let vooShares=null, normRH=null;
+    const rhSeries=[], vooSeries=[];
+    const contribDone = new Set();
+    dates.forEach(date => {
+      CONTRIBUTIONS.forEach(c => {
+        if (contribDone.has(c.date)) return;
+        const tDay = nearestTradingDay(c.date, dates);
+        if (tDay === date) {
+          const vooPrice = historyMap['VOO'][date];
+          if (vooShares !== null && vooPrice) vooShares += c.amount / vooPrice;
+          contribDone.add(c.date);
+        }
+      });
+      let portVal=0, allHave=true;
+      HOLDINGS.forEach(h => { const price=historyMap[h.symbol]?.[date]; if (price==null){allHave=false;return;} portVal+=h.qty*price; });
+      const vooPrice = historyMap['VOO']?.[date];
+      if (!vooPrice || !allHave) return;
+      if (normRH===null) { normRH=portVal; vooShares=STARTING_VALUE/vooPrice; }
+      rhSeries.push( { x: date, y: (portVal/normRH)*STARTING_VALUE });
+      vooSeries.push({ x: date, y: vooShares*vooPrice });
+    });
+    const lastVOO = vooSeries[vooSeries.length-1]?.y ?? 0;
+    const vooRet  = (lastVOO - STARTING_VALUE) / STARTING_VALUE * 100;
+    const diff    = RH_ACTUAL - lastVOO;
+    document.getElementById('vooValue').textContent = '$' + fmt(lastVOO);
+    document.getElementById('vooValue').className   = 'card-value ' + (vooRet >= 0 ? 'pos' : 'neg');
+    document.getElementById('vooSub').textContent   = (vooRet >= 0 ? '+' : '') + vooRet.toFixed(1) + '% return';
+    document.getElementById('alphaValue').textContent = (diff >= 0 ? '+$' : '-$') + fmt(Math.abs(diff));
+    document.getElementById('alphaValue').className   = 'card-value ' + (diff >= 0 ? 'pos' : 'neg');
+    document.getElementById('alphaSub').textContent   = (diff >= 0 ? 'ahead of' : 'behind') + ' VOO · ' + (diff/lastVOO*100).toFixed(1) + '%';
+    document.getElementById('contribValue').textContent = '$' + fmt(totalContributed);
+    document.getElementById('contribValue').className   = 'card-value';
+    const ytd = RH_ACTUAL - DEC31_2025;
+    const ytdPct = ytd / DEC31_2025 * 100;
+    document.getElementById('ytdValue').textContent = (ytd >= 0 ? '+$' : '-$') + fmt(Math.abs(ytd));
+    document.getElementById('ytdValue').className   = 'card-value ' + (ytd >= 0 ? 'pos' : 'neg');
+    document.getElementById('ytdSub').textContent   = (ytdPct >= 0 ? '+' : '') + ytdPct.toFixed(1) + '% since Dec 31, 2025';
+    const dec31Entry = vooSeries.filter(p => p.x <= '2025-12-31').slice(-1)[0];
+    if (dec31Entry) {
+      const vooYtd = lastVOO - dec31Entry.y;
+      const vooYtdPct = vooYtd / dec31Entry.y * 100;
+      document.getElementById('vooYtdValue').textContent = (vooYtd >= 0 ? '+$' : '-$') + fmt(Math.abs(vooYtd));
+      document.getElementById('vooYtdValue').className   = 'card-value ' + (vooYtd >= 0 ? 'pos' : 'neg');
+      document.getElementById('vooYtdSub').textContent   = (vooYtdPct >= 0 ? '+' : '') + vooYtdPct.toFixed(1) + '% since Dec 31, 2025';
+    }
+    dot.className = 'status-dot';
+    text.textContent = `${dates.length} trading days · prices via Yahoo Finance`;
+    const annotations = {};
+    CONTRIBUTIONS.forEach((c, i) => {
+      const tDay = nearestTradingDay(c.date, dates);
+      if (!tDay) return;
+      const label = (new Date(c.date).getMonth() % 3 === 0)
+        ? { content: '+$'+fmt(c.amount*3,0), enabled:true, position:'start', color:'#4ade8099', font:{size:9}, yAdjust:-6 }
+        : { enabled: false };
+      annotations['contrib_'+i] = { type:'line', xMin:tDay, xMax:tDay, borderColor:'rgba(74,222,128,0.18)', borderWidth:1, label };
+    });
+    const ctx = document.getElementById('perfChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: { datasets: [
+        { label:'Robinhood Retirement', data:rhSeries, borderColor:'#60a5fa', backgroundColor:'rgba(96,165,250,0.07)', borderWidth:2.5, pointRadius:0, pointHoverRadius:5, fill:true, tension:0.2 },
+        { label:'VOO (same cash)', data:vooSeries, borderColor:'#a78bfa', backgroundColor:'transparent', borderWidth:2, pointRadius:0, pointHoverRadius:5, fill:false, tension:0.2, borderDash:[5,3] },
+      ]},
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        interaction:{ mode:'index', intersect:false },
+        plugins: {
+          legend:{ display:false },
+          annotation:{ annotations },
+          tooltip: {
+            backgroundColor:'#1e293b', borderColor:'#334155', borderWidth:1, titleColor:'#94a3b8', bodyColor:'#e2e8f0', padding:12,
+            callbacks: { label: ctx => { const val=ctx.parsed.y; const ret=(val-STARTING_VALUE)/STARTING_VALUE*100; return `  ${ctx.dataset.label}: $${fmt(val)}  (${ret>=0?'+':''}${ret.toFixed(1)}%)`; } },
+          },
+        },
+        scales: {
+          x: { type:'time', time:{ unit:'month', displayFormats:{ month:'MMM yy' } }, grid:{ color:'#1e293b' }, ticks:{ color:'#475569', font:{ size:11 } } },
+          y: { grid:{ color:'#1e293b' }, ticks:{ color:'#475569', font:{ size:11 }, callback: v => '$'+fmt(v) } },
+        },
+      },
+    });
+  }
+  buildChart();
+</script>
+
+</body>
+</html>
